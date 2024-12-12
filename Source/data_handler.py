@@ -41,6 +41,7 @@ def openData():
 
 	return np.asarray(time), np.asarray(ticks), np.asarray(model), np.asarray(tracker), np.asarray(world_tracker)
 
+"""
 time, ticks, model_pose, tracker_pose_robot_frame, tracker_pose_world_frame  = openData()
 print("time: ", time.shape)
 print("ticks: ", ticks.shape)
@@ -60,5 +61,7 @@ axs[1].legend()
 axs[2].legend()
 fig.set_figheight(5)
 fig.set_figwidth(18)
+# plt.savefig("Pics/initial_data.png")
 plt.show()
 plt.close()
+"""
