@@ -39,29 +39,34 @@ def openData():
 		tracker.append(tracker_pose)
 		world_tracker.append(rotationMatrix(model_pose[2]) @ np.asarray(tracker_pose)[0:2] + np.asarray(model_pose[0:2]))
 
-	return np.asarray(time), np.asarray(ticks), np.asarray(model), np.asarray(tracker), np.asarray(world_tracker)
+	return np.hstack((np.asarray(time).reshape(-1,1), np.asarray(ticks), np.asarray(model), np.asarray(tracker), np.asarray(world_tracker)))
 
-"""
-time, ticks, model_pose, tracker_pose_robot_frame, tracker_pose_world_frame  = openData()
-print("time: ", time.shape)
-print("ticks: ", ticks.shape)
-print("model_pose: ", model_pose.shape)
-print("tracker_pose_robot_frame: ", tracker_pose_robot_frame.shape)
-print("tracker_pose_world_frame: ", tracker_pose_world_frame.shape)
+if __name__ == "__main__":
+	data  = openData()
+	print(data.shape)
+	time = data[:,0:1]
+	ticks = data[:,1:3]
+	model_pose = data[:,3:6]
+	tracker_pose_robot_frame = data[:,6:9]
+	tracker_pose_world_frame = data[:,9:]
+	print("time: ", time.shape)
+	print("ticks: ", ticks.shape)
+	print("model_pose: ", model_pose.shape)
+	print("tracker_pose_robot_frame: ", tracker_pose_robot_frame.shape)
+	print("tracker_pose_world_frame: ", tracker_pose_world_frame.shape)
 
-fig, axs = plt.subplots(1,3)
-axs[0].scatter(tracker_pose_robot_frame[:,0], tracker_pose_robot_frame[:,1], color="darkorange", label="sensor in robot frame")
-axs[1].scatter(model_pose[:,0], model_pose[:,1], color="yellowgreen", label="robot odometry")
-axs[2].scatter(tracker_pose_world_frame[:,0], tracker_pose_world_frame[:,1], color="cornflowerblue", label="sensor in world frame")
-axs[0].axis("equal")
-axs[1].axis("equal")
-axs[2].axis("equal")
-axs[0].legend()
-axs[1].legend()
-axs[2].legend()
-fig.set_figheight(5)
-fig.set_figwidth(18)
-# plt.savefig("Pics/initial_data.png")
-plt.show()
-plt.close()
-"""
+	fig, axs = plt.subplots(1,3)
+	axs[0].scatter(tracker_pose_robot_frame[:,0], tracker_pose_robot_frame[:,1], color="darkorange", label="sensor in robot frame")
+	axs[1].scatter(model_pose[:,0], model_pose[:,1], color="yellowgreen", label="robot odometry")
+	axs[2].scatter(tracker_pose_world_frame[:,0], tracker_pose_world_frame[:,1], color="cornflowerblue", label="sensor in world frame")
+	axs[0].axis("equal")
+	axs[1].axis("equal")
+	axs[2].axis("equal")
+	axs[0].legend()
+	axs[1].legend()
+	axs[2].legend()
+	fig.set_figheight(5)
+	fig.set_figwidth(18)
+	# plt.savefig("Pics/initial_data.png")
+	plt.show()
+	plt.close()

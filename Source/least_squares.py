@@ -2,9 +2,14 @@ import numpy as np
 from data_handler import rotationMatrix, openData
 
 # TODO: implement the algorithm of least squares, function which plot the error behavior 
-def leastSquares(measurements, predictions):
-    H = np.zeros()
-    b = np.zeros()
+def leastSquares(measurements):
+    state_dim = measurements.shape[1]
+    H = np.zeros((state_dim, state_dim))
+    b = np.zeros((state_dim, 1))
+    initial_robot_pose = measurements[0, 3:6]
+    initial_sensor_pose = measurements[0, :6]
+    initial_odometry_param = [0.1, 0.0106141, 1.4, 0]
+    X0 = [initial_robot_pose, initial_odometry_param, initial_sensor_pose]
     e = [] # error container
     # iterate over all the measurements
     for j in range(len(measurements)):
@@ -33,4 +38,8 @@ def leastSquares(measurements, predictions):
 # steering wheel motion = r_steer = Ksteer * enc_steer
 # traction wheel motion = r_tract = Ktract * enc_tract
 # > Measurements --> position of the robot
-# > Prediction Function --> gives me the position of the sensor
+
+if __name__ == "__main__":
+    measurements = openData() # this is the container for each measurements
+    print(measurements.shape)
+    leastSquares(measurements[:,1:]) # get rid of the time
