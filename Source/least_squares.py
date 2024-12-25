@@ -1,5 +1,5 @@
 import numpy as np
-from data_handler import rotationMatrix, openData
+from utils import rotationMatrix, openData, v2T, T2v
 
 # TODO: implement the algorithm of least squares, function which plot the error behavior 
 def leastSquares(measurements):
@@ -22,6 +22,7 @@ def leastSquares(measurements):
     # now I need to extract the current perturbation
     # H * delta_x = -b 
     # x_star = x_star + delta_x
+    print(state_dim)
     return e
 
 # DATA :

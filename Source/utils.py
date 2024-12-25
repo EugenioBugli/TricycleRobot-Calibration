@@ -41,6 +41,41 @@ def openData():
 
 	return np.hstack((np.asarray(time).reshape(-1,1), np.asarray(ticks), np.asarray(model), np.asarray(tracker), np.asarray(world_tracker)))
 
+def plotInitialConditions(model_pose, tracker_pose_robot_frame, tracker_pose_world_frame):
+	fig, axs = plt.subplots(1,3)
+	axs[0].scatter(tracker_pose_robot_frame[:,0], tracker_pose_robot_frame[:,1], color="darkorange", label="sensor in robot frame")
+	axs[1].scatter(model_pose[:,0], model_pose[:,1], color="yellowgreen", label="robot odometry")
+	axs[2].scatter(tracker_pose_world_frame[:,0], tracker_pose_world_frame[:,1], color="cornflowerblue", label="sensor in world frame")
+	axs[0].axis("equal")
+	axs[1].axis("equal")
+	axs[2].axis("equal")
+	axs[0].legend()
+	axs[1].legend()
+	axs[2].legend()
+	fig.set_figheight(5)
+	fig.set_figwidth(18)
+	plt.savefig("Pics/initial_data.png")
+	plt.show()
+	plt.close()
+
+def v2T(v):
+    # this function is used to transform a vector into an Homogeneous Transformation
+    T = np.array([
+        [np.cos(v[2]),-np.sin(v[2], v[0])],
+        [np.sin(v[2]), np.cos(v[2], v[1])],
+        [0, 0, 1]
+    ])
+    return T
+
+def T2v(T):
+    # this function is used to extract a vector from the related Homogeneous Transformation
+    v = np.array([
+        [T[0,-1]],
+        [T[1,-1]],
+        [np.atan2(T[1,-1], T[0,-1])]
+    ])
+    return v
+
 if __name__ == "__main__":
 	data  = openData()
 	print(data.shape)
@@ -54,19 +89,4 @@ if __name__ == "__main__":
 	print("model_pose: ", model_pose.shape)
 	print("tracker_pose_robot_frame: ", tracker_pose_robot_frame.shape)
 	print("tracker_pose_world_frame: ", tracker_pose_world_frame.shape)
-
-	fig, axs = plt.subplots(1,3)
-	axs[0].scatter(tracker_pose_robot_frame[:,0], tracker_pose_robot_frame[:,1], color="darkorange", label="sensor in robot frame")
-	axs[1].scatter(model_pose[:,0], model_pose[:,1], color="yellowgreen", label="robot odometry")
-	axs[2].scatter(tracker_pose_world_frame[:,0], tracker_pose_world_frame[:,1], color="cornflowerblue", label="sensor in world frame")
-	axs[0].axis("equal")
-	axs[1].axis("equal")
-	axs[2].axis("equal")
-	axs[0].legend()
-	axs[1].legend()
-	axs[2].legend()
-	fig.set_figheight(5)
-	fig.set_figwidth(18)
-	# plt.savefig("Pics/initial_data.png")
-	plt.show()
-	plt.close()
+	plotInitialConditions(model_pose, tracker_pose_robot_frame, tracker_pose_world_frame)
