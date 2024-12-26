@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-f = open("Data/dataset.txt")
+
+MAX_STEER = 8192
+MAX_TRACT = 5000
 
 def rotationMatrix(theta):
 	return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
@@ -76,17 +78,40 @@ def T2v(T):
     ])
     return v
 
+def AnalyzeTime(timestamps):
+	# timestamps: array of al the timestamps
+	return np.concatenate((np.array([[0.0]]), np.diff(timestamps, axis=0)))
+
+def AnalyzeTicks(ticks):
+	# tractor_ticks --> incremental encoder
+	init_ticks = np.array([[0.0]], dtype=np.int64)
+	delta_ticks = np.diff(ticks, axis=0).astype(np.int64)
+	for i in range(len(delta_ticks)):
+		if delta_ticks[i] > MAX_TRACT // 2:
+			delta_ticks[i] -= MAX_TRACT
+		elif delta_ticks[i] < -MAX_TRACT // 2:
+			delta_ticks[i] += MAX_TRACT
+	data = np.cumsum(delta_ticks)
+	norm_data = data % MAX_TRACT
+	return np.concatenate((init_ticks, norm_data.reshape(-1,1)))
+
 if __name__ == "__main__":
 	data  = openData()
 	print(data.shape)
 	time = data[:,0:1]
-	ticks = data[:,1:3]
+	steer_ticks = data[:,1:2]
+	tract_ticks = data[:,2:3].astype(dtype=np.uint32)
 	model_pose = data[:,3:6]
 	tracker_pose_robot_frame = data[:,6:9]
 	tracker_pose_world_frame = data[:,9:]
 	print("time: ", time.shape)
-	print("ticks: ", ticks.shape)
+	print("steer_ticks: ", steer_ticks.shape)
+	print("tract_ticks: ", tract_ticks.shape)
 	print("model_pose: ", model_pose.shape)
 	print("tracker_pose_robot_frame: ", tracker_pose_robot_frame.shape)
 	print("tracker_pose_world_frame: ", tracker_pose_world_frame.shape)
-	plotInitialConditions(model_pose, tracker_pose_robot_frame, tracker_pose_world_frame)
+	# plotInitialConditions(model_pose, tracker_pose_robot_frame, tracker_pose_world_frame)
+	instants_of_time = AnalyzeTime(time)
+	tractor_ticks = AnalyzeTicks(tract_ticks)
+
+	print(np.unique(steer_ticks))
