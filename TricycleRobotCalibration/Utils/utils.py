@@ -2,10 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-MAX_STEER = 8192
-MAX_TRACT = 5000
-
-def rotationMatrix(theta):
+def getRotationMatrix(theta):
 	return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 
 def openData():
@@ -66,12 +63,12 @@ def plotInitialConditions(model_pose, tracker_pose_robot_frame, tracker_pose_wor
 
 def v2T(v):
     # this function is used to transform a vector into an Homogeneous Transformation
-    T = np.array([
-        [np.cos(v[2]),-np.sin(v[2], v[0])],
-        [np.sin(v[2]), np.cos(v[2], v[1])],
+	x, y, theta = v
+	return np.array([
+        [np.cos(theta),-np.sin(theta), x],
+        [np.sin(theta), np.cos(theta), y],
         [0, 0, 1]
     ])
-    return T
 
 def T2v(T):
     # this function is used to extract a vector from the related Homogeneous Transformation

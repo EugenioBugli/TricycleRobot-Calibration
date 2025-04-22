@@ -2,8 +2,8 @@ import os
 import numpy as np
 from yaml import safe_load
 import matplotlib.pyplot as plt
-from least_squares import leastSquares
-from utils import openData, plotInitialConditions
+from TricycleRobotCalibration.Calibration.least_squares import leastSquares
+from TricycleRobotCalibration.Utils.utils import openData, plotInitialConditions
 
 this_dir = os.path.dirname(os.path.realpath(__file__))
 with open(this_dir + '/config.yml', 'r') as file:
@@ -13,7 +13,7 @@ MAX_STEER_TICK = conf["MAX_STEER_TICKS"]
 MAX_TRACT_TICK = conf["MAX_TRACT_TICKS"]
 
 INITIAL_K_STEER = conf["INITIAL_K_STEER"]
-INITIAL_K_TARCT = conf["INITIAL_K_TARCT"]
+INITIAL_K_TRACT = conf["INITIAL_K_TRACT"]
 INITIAL_AXIS_LENGTH = conf["INITIAL_AXIS_LENGTH"]
 INITIAL_STEER_OFFSET = conf["INITIAL_STEER_OFFSET"]
 
