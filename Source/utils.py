@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -8,7 +9,10 @@ def rotationMatrix(theta):
 	return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 
 def openData():
-	f = open("Data/dataset.txt")
+	this_dir = os.path.dirname(os.path.realpath(__file__)) # Source
+	current_dir = os.path.dirname(this_dir) # ../Source 
+
+	f = open(current_dir + "/Data/dataset.txt")
 	lines = f.read().splitlines()
 	c = 0
 	time = []

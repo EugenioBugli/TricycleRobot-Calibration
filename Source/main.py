@@ -1,24 +1,27 @@
+import os
 import numpy as np
-from utils import openData, plotInitialConditions
+from yaml import safe_load
+import matplotlib.pyplot as plt
 from least_squares import leastSquares
+from utils import openData, plotInitialConditions
 
-# given the tricycle structure of the front tractor wheel robot, we can collapse the two rear wheels into one and use
-# a bicycle equivalent model
+this_dir = os.path.dirname(os.path.realpath(__file__))
+with open(this_dir + '/config.yml', 'r') as file:
+    conf = safe_load(file)
 
-# FWD Bicycle Model
+MAX_STEER_TICK = conf["MAX_STEER_TICKS"]
+MAX_TRACT_TICK = conf["MAX_TRACT_TICKS"]
 
-# param config_vector: [x y theta psi]
-# param control_inputs: [v w]
-# param l: axis length (RF place at the mid)
-        
-#   self.xdot = controls[0]*np.cos(state[2])*np.cos(state[3])
-#   self.ydot = controls[0]*np.sin(state[2])*np.sin(state[3])
-#   self.thetadot = controls[0]*np.sin(state[3])/l
-#   self.psidot = controls[1]
+INITIAL_K_STEER = conf["INITIAL_K_STEER"]
+INITIAL_K_TARCT = conf["INITIAL_K_TARCT"]
+INITIAL_AXIS_LENGTH = conf["INITIAL_AXIS_LENGTH"]
+INITIAL_STEER_OFFSET = conf["INITIAL_STEER_OFFSET"]
+
+LASER_WRT_BASE_X = conf["LASER_WRT_BASE_X"]
+LASER_WRT_BASE_ANGLE = conf["LASER_WRT_BASE_ANGLE"]
 
 def get_steering_angle(tick, K_steer):
     # ABSOLUTE Encoder
-    MAX_STEER_TICK = 8192
 
     if tick > MAX_STEER_TICK/2:
         s = tick - MAX_STEER_TICK
@@ -32,9 +35,8 @@ def get_steering_angle(tick, K_steer):
 def get_traction_distance(tick, next_tick, K_tract):
     # INCREMENTAL Encoder
     # tick and next_tick are uint32 values
-    MAX_TRACT_TICK = 5000
-    MAX_INT_32 = np.iinfo(np.int32).max
-    MAX_UINT_32 = np.iinfo(np.uint32).max
+    # MAX_INT_32 = np.iinfo(np.int32).max
+    # MAX_UINT_32 = np.iinfo(np.uint32).max
 
     t = next_tick - tick
 
@@ -76,6 +78,8 @@ def main():
     robot_pose = data[:,3:6]
     tracker_pose_robot_frame = data[:,6:9]
     tracker_pose_world_frame = data[:,9:]
+
+    kinematic_parameters = 1
 
     # check if the model that you have defined is correct:
 
