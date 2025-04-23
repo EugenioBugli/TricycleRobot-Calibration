@@ -19,15 +19,15 @@ class Tricycle:
     def __init__(self, initial_pose):
 
         self.pose = initial_pose # x, y, theta
-        self.sensor_pose = np.array([
+        self.sensor_pose = np.array([ # pose with respect to the robot
             LASER_WRT_BASE_X, 0, LASER_WRT_BASE_ANGLE
         ])
-        self.kinematic_parameters = np.array([
-            INITIAL_K_STEER,
-            INITIAL_K_TRACT,
-            INITIAL_AXIS_LENGTH,
-            INITIAL_STEER_OFFSET,
-        ])
+        self.kinematic_parameters = {
+            "K_STEER": INITIAL_K_STEER,
+            "K_TRACT": INITIAL_K_TRACT,
+            "AXIS_LENGTH": INITIAL_AXIS_LENGTH,
+            "STEER_OFFSET": INITIAL_STEER_OFFSET,
+        }
 
     def getTransformation(self):
         return v2T(self.pose)
