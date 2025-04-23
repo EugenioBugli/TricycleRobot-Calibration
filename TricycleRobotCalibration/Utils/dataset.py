@@ -1,6 +1,7 @@
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
+from TricycleRobotCalibration.Utils.utils import getRotationMatrix
 
 utils_dir = Path(__file__).resolve().parents[2]
 
@@ -40,19 +41,57 @@ def openData():
 class Dataset:
 	
 	def __init__(self):
-		self.raw_data = openData() # just read the .txt file 
+
+		raw_data = openData() # just read the .txt file 
+		# processed_ticks = ticksPreProcessing(raw_ticks)
+
+		# shapes will be (N, relative dimension)
+		self.time = raw_data["time"]
+		self.tract_ticks = 0 #processed_ticks["tract"]
+		self.steer_ticks = 0 #processed_ticks["steer"]
+		self.robot_poses = raw_data["model_poses"]
+		self.sensor_poses = raw_data["sensor_poses"]
 		
-		def ticksPreProcessing(self):
-			raw_ticks = self.raw_data["ticks"]
+	@staticmethod
+	def ticksPreProcessing(raw_ticks):
+
+		return {
+			"steer": 0,
+			"tract": 0}
 			
-		@staticmethod
-		def getSteeringAngle():
-			return 0
+	@staticmethod
+	def getSteeringAngle():
+		return 0
 		
-		@staticmethod
-		def getTractionDistance():
-			return 0
+	@staticmethod
+	def getTractionDistance():
+		return 0
+		
+	def plotData(self):
+
+		x_rob, y_rob, theta_rob = self.robot_poses.T
+		x_sens_wrt_r, y_sens_wrt_r, _ = self.sensor_poses.T
+		# given that the position of the sensor is given wrt to the robot frame, the position of the sensor wrt the world frame is R @ r_p_s + r_p_s
+
+		fig, axs = plt.subplots(1,3)
+
+		axs[0].scatter(x_rob, y_rob, color="yellowgreen", label="Robot Odometry")
+		axs[1].scatter(x_sens_wrt_r, y_sens_wrt_r, color="darkorange", label="Sensor wrt Robot RF")
+		#axs[2].scatter(x_sens_wrt_w, y_sens_wrt_w, color="cornflowerblue", label="Sensor wrt World RF")
+
+		axs[0].axis("equal")
+		axs[1].axis("equal")
+		axs[2].axis("equal")
+		axs[0].legend()
+		axs[1].legend()
+		#axs[2].legend()
+		fig.set_figheight(5)
+		fig.set_figwidth(18)
+		plt.savefig(PICS_PATH / "initial_data.png")
+		plt.show()
+		plt.close()
+
 		
 if __name__ == "__main__":
 	data = Dataset()
-	print(data.raw_data)
+	data.plotData()
