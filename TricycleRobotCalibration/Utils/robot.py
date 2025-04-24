@@ -1,10 +1,11 @@
 import os
 import numpy as np
+from pathlib import Path
 from yaml import safe_load
 from TricycleRobotCalibration.Utils.utils import getRotationMatrix, v2T, T2v
 
-this_dir = os.path.dirname(os.path.realpath(__file__))
-with open(this_dir + '/config.yml', 'r') as file:
+this_dir = Path(__file__).resolve().parents[1]
+with open(this_dir / 'config.yml', 'r') as file:
     conf = safe_load(file)
 
 INITIAL_K_STEER = conf["INITIAL_K_STEER"]

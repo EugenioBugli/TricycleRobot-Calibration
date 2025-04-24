@@ -47,11 +47,13 @@ class Dataset:
 
 		# shapes will be (N, relative dimension)
 		self.time = raw_data["time"]
-		self.tract_ticks = 0 #processed_ticks["tract"]
-		self.steer_ticks = 0 #processed_ticks["steer"]
+		self.tract_ticks = raw_data["ticks"][:, 0:1]
+		self.steer_ticks = raw_data["ticks"][:, 1:2]
 		self.robot_poses = raw_data["model_poses"]
 		self.sensor_poses = raw_data["sensor_poses"]
-		
+
+		self.length = self.time.shape[0] 
+	
 	@staticmethod
 	def ticksPreProcessing(raw_ticks):
 
@@ -94,4 +96,4 @@ class Dataset:
 		
 if __name__ == "__main__":
 	data = Dataset()
-	data.plotData()
+	# data.plotData()
