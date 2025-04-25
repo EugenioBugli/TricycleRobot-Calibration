@@ -1,5 +1,17 @@
 import numpy as np
+from pathlib import Path
+from yaml import safe_load
 import matplotlib.pyplot as plt
+
+source_dir = Path(__file__).resolve().parents[1]
+with open(source_dir / "config.yml", 'r') as file:
+    conf = safe_load(file)
+
+MAX_STEER_TICK = conf["MAX_STEER_TICKS"]
+MAX_TRACT_TICK = conf["MAX_TRACT_TICKS"]
+
+MAX_INT_32 = np.iinfo(np.int32).max
+MAX_UINT_32 = np.iinfo(np.uint32).max
 
 def getRotationMatrix(theta):
 	return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
@@ -22,6 +34,27 @@ def T2v(T):
     ])
     return v
 
-def AnalyzeTime(timestamps):
-	# timestamps: array of al the timestamps
-	return np.concatenate((np.array([[0.0]]), np.diff(timestamps, axis=0)))
+def get_steering_angle(tick, K_steer):
+    # ABSOLUTE Encoder
+
+    if tick > MAX_STEER_TICK/2:
+        s = tick - MAX_STEER_TICK
+    else:
+        s = tick
+
+    angle = s * K_steer
+
+    return (2*np.pi/MAX_STEER_TICK) * angle
+
+def get_traction_distance(tick, next_tick, K_tract):
+    # INCREMENTAL Encoder
+    # tick and next_tick are uint32 values
+    t = next_tick - tick
+
+    # fix possible overflow
+    if t > MAX_INT_32:
+        t -= MAX_UINT_32
+    elif t < -MAX_INT_32:
+        t += MAX_UINT_32
+
+    return t*K_tract / MAX_TRACT_TICK

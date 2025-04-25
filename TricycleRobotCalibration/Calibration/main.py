@@ -5,17 +5,15 @@ from yaml import safe_load
 import matplotlib.pyplot as plt
 from TricycleRobotCalibration.Utils.robot import Tricycle
 from TricycleRobotCalibration.Utils.dataset import Dataset
-from TricycleRobotCalibration.Utils.utils import v2T, T2v, getRotationMatrix
 from TricycleRobotCalibration.Calibration.least_squares import leastSquares
+from TricycleRobotCalibration.Utils.utils import v2T, T2v, getRotationMatrix, get_steering_angle, get_traction_distance
 
-this_dir = Path(__file__).resolve().parents[1]
-print(this_dir)
-with open(this_dir / "config.yml", 'r') as file:
+source_dir = Path(__file__).resolve().parents[1]
+with open(source_dir / "config.yml", 'r') as file:
     conf = safe_load(file)
 
-parent_dir = this_dir.parent
-
-PICS_PATH = parent_dir / "Pics"
+home_dir = source_dir.parent
+PICS_PATH = home_dir / "Pics"
 
 MAX_STEER_TICK = conf["MAX_STEER_TICKS"]
 MAX_TRACT_TICK = conf["MAX_TRACT_TICKS"]
@@ -27,34 +25,6 @@ INITIAL_STEER_OFFSET = conf["INITIAL_STEER_OFFSET"]
 
 LASER_WRT_BASE_X = conf["LASER_WRT_BASE_X"]
 LASER_WRT_BASE_ANGLE = conf["LASER_WRT_BASE_ANGLE"]
-
-def get_steering_angle(tick, K_steer):
-    # ABSOLUTE Encoder
-
-    if tick > MAX_STEER_TICK/2:
-        s = tick - MAX_STEER_TICK
-    else:
-        s = tick
-
-    angle = s * K_steer
-
-    return (2*np.pi/MAX_STEER_TICK) * angle
-
-def get_traction_distance(tick, next_tick, K_tract):
-    # INCREMENTAL Encoder
-    # tick and next_tick are uint32 values
-    MAX_INT_32 = np.iinfo(np.int32).max
-    MAX_UINT_32 = np.iinfo(np.uint32).max
-
-    t = next_tick - tick
-
-    # fix possible overflow
-    if t > MAX_INT_32:
-        t -= MAX_UINT_32
-    elif t < -MAX_INT_32:
-        t += MAX_UINT_32
-
-    return t*K_tract / MAX_TRACT_TICK
 
 def model_prediction(robot_pose, steer_tick, current_tract_tick, next_tract_tick, kine_param):
     # with this function you use the model of the robot to predict the next state
@@ -120,7 +90,7 @@ def main():
     predicted_poses = np.array(predicted_poses)
     fig, axs = plt.subplots(1,2)
 
-    axs[0].scatter(predicted_poses[:, 0], predicted_poses[:, 1], color="blue", label="Model Prediction")
+    axs[0].scatter(predicted_poses[:, 0], predicted_poses[:, 1], color="mediumseagreen", label="Model Prediction")
     axs[1].scatter(data.robot_poses[:, 0], data.robot_poses[:, 1], color="orange", label="Ground Truth")
     axs[0].set_aspect("equal")
     axs[1].set_aspect("equal")
@@ -128,7 +98,7 @@ def main():
     axs[1].legend()
     fig.set_figheight(5)
     fig.set_figwidth(18)
-    plt.savefig(PICS_PATH / "model.png")
+    plt.savefig(PICS_PATH / "model_vs_gt.png")
     plt.close()
 
 if __name__ == "__main__":

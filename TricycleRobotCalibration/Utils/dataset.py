@@ -42,8 +42,7 @@ class Dataset:
 	
 	def __init__(self):
 
-		raw_data = openData() # just read the .txt file 
-		# processed_ticks = ticksPreProcessing(raw_ticks)
+		raw_data = openData() # just read the .txt file
 
 		# shapes will be (N, relative dimension)
 		self.time = raw_data["time"]
@@ -53,25 +52,10 @@ class Dataset:
 		self.sensor_poses = raw_data["sensor_poses"]
 
 		self.length = self.time.shape[0] 
-	
-	@staticmethod
-	def ticksPreProcessing(raw_ticks):
-
-		return {
-			"steer": 0,
-			"tract": 0}
-			
-	@staticmethod
-	def getSteeringAngle():
-		return 0
-		
-	@staticmethod
-	def getTractionDistance():
-		return 0
 		
 	def plotData(self):
 
-		x_rob, y_rob, theta_rob = self.robot_poses.T
+		x_rob, y_rob, _ = self.robot_poses.T
 		x_sens_wrt_r, y_sens_wrt_r, _ = self.sensor_poses.T
 		# given that the position of the sensor is given wrt to the robot frame, the position of the sensor wrt the world frame is R @ r_p_s + r_p_s
 
