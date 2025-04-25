@@ -26,33 +26,12 @@ INITIAL_STEER_OFFSET = conf["INITIAL_STEER_OFFSET"]
 LASER_WRT_BASE_X = conf["LASER_WRT_BASE_X"]
 LASER_WRT_BASE_ANGLE = conf["LASER_WRT_BASE_ANGLE"]
 
-def model_prediction(robot_pose, steer_tick, current_tract_tick, next_tract_tick, kine_param):
-    # with this function you use the model of the robot to predict the next state
-    x_rob, y_rob, theta_rob = robot_pose
-    K_steer = kine_param["K_STEER"]
-    K_tract = kine_param["K_TRACT"] 
-    axis_length = kine_param["AXIS_LENGTH"] 
-    steer_offset = kine_param["STEER_OFFSET"]
-    # x_sens, y_sens, theta_sens = kine_param
+def checkModelValidity(predicted_poses, data):
+    predicted_poses = np.array(predicted_poses)
+    data.plotModelData(predicted_poses)
 
-    # print(f"kine param: {K_steer}, {K_tract}, {axis_length}, {steer_offset}")
-    steering_angle = get_steering_angle(steer_tick, K_steer)
-    traction_distance = get_traction_distance(current_tract_tick, next_tract_tick, K_tract)
-
-    linear_velocity = traction_distance
-    angular_velocity = steering_angle
-
-    # print(f"s: {steering_angle}, t: {traction_distance}")
-
-    # kinematic model of the robot with the elimination of dt
-
-    dx = np.cos(steering_angle)*np.cos(theta_rob) * traction_distance
-    dy = np.cos(steering_angle)*np.sin(theta_rob) * traction_distance
-    dtheta = (np.sin(steering_angle) / axis_length) * traction_distance
-    dphi = steering_angle
-
-    return dx.item(), dy.item(), dtheta.item(), dphi.item() # displacement dato dalla predizione del modello
-
+    if np.allclose(predicted_poses[:, :2], data.robot_poses[:-1, :2], atol=1e-6):
+        print("The prediction given by the model is correct")
 
 def main():
 
@@ -64,42 +43,14 @@ def main():
 
     for i in range(data.length-1):
         # i-th measurement
-        robot_pose = data.robot_poses[i]
-        steer_tick = data.steer_ticks[i]
-        tract_tick = data.tract_ticks[i]
-        next_tract_tick = data.tract_ticks[i+1]
-
-        # print(f" i-th measurement: {robot_pose}, {steer_tick}, {tract_tick}, {next_tract_tick}")
+        robot_pose, steer_tick, tract_tick, next_tract_tick = data.getMeasurement(i)
+        dx, dy, dtheta, _ = robot.ModelPrediction(steer_tick, tract_tick, next_tract_tick)
         
-        dx, dy, dtheta, dphi = model_prediction(
-            robot_pose, steer_tick, tract_tick, next_tract_tick, robot.kinematic_parameters)
-        
-        # print(f" model_prediction: {dx}, {dy}, {dtheta} \n")
-        measurement = np.array([[dx, dy, dtheta]])
-
-        # print(f"Movements: {predicted_poses.shape}, measurement: {measurement.shape}")
-        # get next poses of the robot and of the sensor
-        
-        r_T = v2T(measurement.flatten())
-        w_T_r = robot.getTransformation()
-
-
-        robot.pose = T2v(w_T_r @ r_T)
+        prediction = np.array([[dx, dy, dtheta]]) # that's the prediction of the model aka how much you have moved from your previous reading
+        robot.updatePose(prediction)
         predicted_poses.append(robot_pose.copy())
 
-    predicted_poses = np.array(predicted_poses)
-    fig, axs = plt.subplots(1,2)
-
-    axs[0].scatter(predicted_poses[:, 0], predicted_poses[:, 1], color="mediumseagreen", label="Model Prediction")
-    axs[1].scatter(data.robot_poses[:, 0], data.robot_poses[:, 1], color="orange", label="Ground Truth")
-    axs[0].set_aspect("equal")
-    axs[1].set_aspect("equal")
-    axs[0].legend()
-    axs[1].legend()
-    fig.set_figheight(5)
-    fig.set_figwidth(18)
-    plt.savefig(PICS_PATH / "model_vs_gt.png")
-    plt.close()
+    checkModelValidity(predicted_poses, data)
 
 if __name__ == "__main__":
     main()

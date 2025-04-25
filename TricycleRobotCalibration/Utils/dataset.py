@@ -77,6 +77,28 @@ class Dataset:
 		plt.show()
 		plt.close()
 
+	def plotModelData(self, predicted_poses):
+		# plot the prediction given by the model from the encoders measurement and the real position
+		fig, axs = plt.subplots(1,2)
+		axs[0].scatter(predicted_poses[:, 0], predicted_poses[:, 1], color="mediumseagreen", label="Model Prediction")
+		axs[1].scatter(self.robot_poses[:, 0], self.robot_poses[:, 1], color="darkorange", label="Ground Truth")
+		axs[0].set_aspect("equal")
+		axs[1].set_aspect("equal")
+		axs[0].legend()
+		axs[1].legend()
+		axs[0].set_xlabel("X")
+		axs[0].set_ylabel("Y")
+		axs[1].set_xlabel("X")
+		axs[1].set_ylabel("Y")
+		fig.set_figheight(5)
+		fig.set_figwidth(18)
+		fig.suptitle("Comparison between the real poses and the prediction of the Model obtained from the Encoder readings")
+		plt.savefig(PICS_PATH / "model_vs_gt.png")
+		plt.close()
+
+	def getMeasurement(self, idx):
+		# use this to get the idx-th measurement composed by:
+		return self.robot_poses[idx], self.steer_ticks[idx], self.tract_ticks[idx], self.tract_ticks[idx+1]
 		
 if __name__ == "__main__":
 	data = Dataset()
