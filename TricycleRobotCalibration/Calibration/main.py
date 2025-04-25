@@ -5,12 +5,17 @@ from yaml import safe_load
 import matplotlib.pyplot as plt
 from TricycleRobotCalibration.Utils.robot import Tricycle
 from TricycleRobotCalibration.Utils.dataset import Dataset
+from TricycleRobotCalibration.Utils.utils import v2T, T2v, getRotationMatrix
 from TricycleRobotCalibration.Calibration.least_squares import leastSquares
 
 this_dir = Path(__file__).resolve().parents[1]
 print(this_dir)
 with open(this_dir / "config.yml", 'r') as file:
     conf = safe_load(file)
+
+parent_dir = this_dir.parent
+
+PICS_PATH = parent_dir / "Pics"
 
 MAX_STEER_TICK = conf["MAX_STEER_TICKS"]
 MAX_TRACT_TICK = conf["MAX_TRACT_TICKS"]
@@ -60,14 +65,14 @@ def model_prediction(robot_pose, steer_tick, current_tract_tick, next_tract_tick
     steer_offset = kine_param["STEER_OFFSET"]
     # x_sens, y_sens, theta_sens = kine_param
 
-    print(f"kine param: {K_steer}, {K_tract}, {axis_length}, {steer_offset}")
+    # print(f"kine param: {K_steer}, {K_tract}, {axis_length}, {steer_offset}")
     steering_angle = get_steering_angle(steer_tick, K_steer)
     traction_distance = get_traction_distance(current_tract_tick, next_tract_tick, K_tract)
 
     linear_velocity = traction_distance
     angular_velocity = steering_angle
 
-    print(f"s: {steering_angle}, t: {traction_distance}")
+    # print(f"s: {steering_angle}, t: {traction_distance}")
 
     # kinematic model of the robot with the elimination of dt
 
@@ -76,7 +81,7 @@ def model_prediction(robot_pose, steer_tick, current_tract_tick, next_tract_tick
     dtheta = (np.sin(steering_angle) / axis_length) * traction_distance
     dphi = steering_angle
 
-    return dx, dy, dtheta, dphi # displacement dato dalla predizione del modello
+    return dx.item(), dy.item(), dtheta.item(), dphi.item() # displacement dato dalla predizione del modello
 
 
 def main():
@@ -85,6 +90,9 @@ def main():
     robot = Tricycle(np.array([0.0,0.0,0.0]))
     # check if the model that you have defined is correct:
 
+    predicted_poses = np.array([[0,0,0]])
+
+    fig, ax = plt.subplots()
     for i in range(data.length-1):
         # i-th measurement
         robot_pose = data.robot_poses[i]
@@ -92,14 +100,30 @@ def main():
         tract_tick = data.tract_ticks[i]
         next_tract_tick = data.tract_ticks[i+1]
 
-        print(f" i-th measurement: {robot_pose}, {steer_tick}, {tract_tick}, {next_tract_tick}")
+        # print(f" i-th measurement: {robot_pose}, {steer_tick}, {tract_tick}, {next_tract_tick}")
         
-        robot.pose = robot_pose
         dx, dy, dtheta, dphi = model_prediction(
             robot_pose, steer_tick, tract_tick, next_tract_tick, robot.kinematic_parameters)
+        
+        # print(f" model_prediction: {dx}, {dy}, {dtheta} \n")
+        measurement = np.array([[dx, dy, dtheta]])
 
-        print(f" model_prediction: {dx}, {dy}, {dtheta} \n")
+        # print(f"Movements: {predicted_poses.shape}, measurement: {measurement.shape}")
         # get next poses of the robot and of the sensor
+        x, y, theta = measurement.T
+        r_T = v2T(measurement.flatten())
+        w_T_r = robot.getTransformation()
 
+
+        robot.pose = T2v(w_T_r @ r_T)
+        predicted_poses = np.vstack((predicted_poses, robot_pose))
+
+        ax.scatter(robot_pose[0], robot_pose[1])
+
+    print(predicted_poses.shape)
+    ax.legend()
+    plt.savefig(PICS_PATH / "model.png")
+    # plt.show()
+    plt.close()
 if __name__ == "__main__":
     main()

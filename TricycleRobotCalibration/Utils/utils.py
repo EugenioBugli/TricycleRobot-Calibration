@@ -18,7 +18,7 @@ def T2v(T):
     v = np.array([
         [T[0,-1]],
         [T[1,-1]],
-        [np.atan2(T[1,-1], T[0,-1])]
+        [np.arctan2(T[1,-1], T[0,-1])]
     ])
     return v
 

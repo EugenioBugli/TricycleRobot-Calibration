@@ -31,7 +31,7 @@ class Tricycle:
         }
 
     def getTransformation(self):
-        return v2T(self.pose)
+        return v2T(self.pose.flatten())
     
     def update(self, new_pose, new_kinematic_parameters):
         self.pose = new_pose
