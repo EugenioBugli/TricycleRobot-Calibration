@@ -90,9 +90,8 @@ def main():
     robot = Tricycle(np.array([0.0,0.0,0.0]))
     # check if the model that you have defined is correct:
 
-    predicted_poses = np.array([[0,0,0]])
+    predicted_poses = []
 
-    fig, ax = plt.subplots()
     for i in range(data.length-1):
         # i-th measurement
         robot_pose = data.robot_poses[i]
@@ -110,20 +109,27 @@ def main():
 
         # print(f"Movements: {predicted_poses.shape}, measurement: {measurement.shape}")
         # get next poses of the robot and of the sensor
-        x, y, theta = measurement.T
+        
         r_T = v2T(measurement.flatten())
         w_T_r = robot.getTransformation()
 
 
         robot.pose = T2v(w_T_r @ r_T)
-        predicted_poses = np.vstack((predicted_poses, robot_pose))
+        predicted_poses.append(robot_pose.copy())
 
-        ax.scatter(robot_pose[0], robot_pose[1])
+    predicted_poses = np.array(predicted_poses)
+    fig, axs = plt.subplots(1,2)
 
-    print(predicted_poses.shape)
-    ax.legend()
+    axs[0].scatter(predicted_poses[:, 0], predicted_poses[:, 1], color="blue", label="Model Prediction")
+    axs[1].scatter(data.robot_poses[:, 0], data.robot_poses[:, 1], color="orange", label="Ground Truth")
+    axs[0].set_aspect("equal")
+    axs[1].set_aspect("equal")
+    axs[0].legend()
+    axs[1].legend()
+    fig.set_figheight(5)
+    fig.set_figwidth(18)
     plt.savefig(PICS_PATH / "model.png")
-    # plt.show()
     plt.close()
+
 if __name__ == "__main__":
     main()
