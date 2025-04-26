@@ -1,46 +1,71 @@
 import numpy as np
+from autograd import grad, jacobian
+from TricycleRobotCalibration.Utils.robot import Tricycle
+from TricycleRobotCalibration.Utils.dataset import Dataset
 from TricycleRobotCalibration.Utils.utils import getRotationMatrix, v2T, T2v
 
-# TODO: implement the algorithm of least squares, function which plot the error behavior 
-def leastSquares(measurements):
-    state_dim = measurements.shape[1]
-    H = np.zeros((state_dim, state_dim))
-    b = np.zeros((state_dim, 1))
-    initial_robot_pose = measurements[0, 3:6]
-    initial_sensor_pose = measurements[0, :6]
-    initial_odometry_param = [0.1, 0.0106141, 1.4, 0]
-    X0 = [initial_robot_pose, initial_odometry_param, initial_sensor_pose]
-    e = [] # error container
-    # iterate over all the measurements
-    for j in range(len(measurements)):
-        # e_jth = (jth error) current prediction wrt to the current xstar - current measurement
-        # e.append(e_jth)
-        # J = jacobian of the error wrt to the state and evaluated in the current xstar
-        # H = H + J' * omega * J
-        # b = b + J' * omega * e
-        print(f"iter: {j}") 
-    # now I need to extract the current perturbation
-    # H * delta_x = -b 
-    # x_star = x_star + delta_x
-    print(state_dim)
-    return e
+STATE_DIM = 7
+MEASUREMENT_DIM = 3
+NUM_ITERATIONS = 1
+NUM_MEASUREMENTS = 1
 
-# DATA :
-# timestamps
-# absolute encoder ticks --> steering (max_value = 8192)
-# incremental encoder ticks --> traction_wheel (max_value = 5000)
-# model_pose (odometry) [x, y, theta]
-# tracker_pose (sensor position wrt robot) [x_s, y_s, theta_s]
+def boxminus():
+    return 0
 
-# Nominal values: Ksteer=0.1 Ktract=0.0106141 axis_length=1.4 steer_offset=0 
+def boxplus():
+    return 0
+
+def computeError(prediction, measurement):
+    # prediction boxminus measurement
+    return boxminus(prediction, measurement)
+
+def computeJacobian(error):
+    # jacobian of the error wrt to the state calculated in the actual state
+    return jacobian(error)
+
+def leastSquares(data):
+    print("Init Least Squares Algo")
+
+    H = np.zeros(shape=(STATE_DIM, STATE_DIM))
+    b = np.zeros(shape=(STATE_DIM, 1))
+
+    for i in range(NUM_ITERATIONS):
+        print(f"Iteration number {i}")
+
+        for j in range(NUM_MEASUREMENTS):
+            # for each measurement you have to update H and b
+            omega = np.eye(MEASUREMENT_DIM) # (3,3)
+            error = np.zeros(shape=(MEASUREMENT_DIM, 1)) # (3,1)
+            Jacobian = np.zeros(shape=(MEASUREMENT_DIM, STATE_DIM)) # (3,7)
+
+            H_value = Jacobian.T @ omega @ Jacobian
+            b_value = Jacobian.T @ omega @ error
+
+            H = H + H_value
+            b = b + b_value
+
+        # update your estimate with the perturbation
+
+    print("Finish Least Square Algo")
 
 # DEFINITIONS :
-# > State (robot_pose | odometry_param | sensor_pose) = [x_r y_r theta_r | Ksteer Ktract axis_length steer_offset | x_sens y_sens]
-# steering wheel motion = r_steer = Ksteer * enc_steer
-# traction wheel motion = r_tract = Ktract * enc_tract
-# > Measurements --> position of the robot
+"""
+    STATE:
+        X: {kinematic parameters | sensor pose relative to the robot} = 4 values that belongs to R and one that belongs to SE(2)
+        delta_x: {K_steer K_tract axis_length steer_offset | r_x_s r_y_s r_theta_s} euclidean param needed only for the sensor
+        box_plus:
+            for the kinematic parameter: X_k <- X_k + delta_x_k
+            for the sensor pose: X_s <- X_s @ v2T(delta_x_s)
+
+    MEASUREMENT:
+        Z: {sensor pose given by odometry of the sensor} = {x_s y_s theta_s} belongs to SE(2)
+        delta_z: {x_s y_s theta_s} euclidean param needed
+        box_minus:
+            v2T(delta_z) <- Z'@ Z TODO finish this
+"""
+# > State (kinematic_param | sensor_pose) = [Ksteer Ktract axis_length steer_offset | x_sens y_sens theta_sens]
+# > Measurements --> position of the sensor wrt the robot
 
 if __name__ == "__main__":
-    measurements = openData() # this is the container for each measurements
-    print(measurements.shape)
-    leastSquares(measurements[:,1:]) # get rid of the time
+    data = Dataset()
+    leastSquares(data)
