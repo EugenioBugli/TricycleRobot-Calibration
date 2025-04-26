@@ -98,7 +98,7 @@ class Dataset:
 
 	def getMeasurement(self, idx):
 		# use this to get the idx-th measurement composed by:
-		return self.robot_poses[idx], self.steer_ticks[idx], self.tract_ticks[idx], self.tract_ticks[idx+1]
+		return self.robot_poses[idx], self.steer_ticks[idx], self.tract_ticks[idx], self.tract_ticks[idx+1], self.sensor_poses[idx]
 		
 if __name__ == "__main__":
 	data = Dataset()

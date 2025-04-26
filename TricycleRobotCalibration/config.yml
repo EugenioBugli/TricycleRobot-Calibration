@@ -1,14 +1,18 @@
 MAX_STEER_TICKS: 8192
 MAX_TRACT_TICKS: 5000
 
-# initial values for the kinematic parameters
+# initial values for the kinematic parameters and the relative position of the sensor aka my state X
 
 INITIAL_K_STEER: 0.1
 INITIAL_K_TRACT: 0.0106141
 INITIAL_AXIS_LENGTH : 1.4
 INITIAL_STEER_OFFSET : 0
 
-# parameters useful to define the transformation
+INITIAL_LASER_WRT_BASE_X: 1.5
+INITIAL_LASER_WRT_BASE_Y: 0
+INITIAL_LASER_WRT_BASE_ANGLE: 0
 
-LASER_WRT_BASE_X: 1.5
-LASER_WRT_BASE_ANGLE: 0
+STATE_DIM: 7
+MEASUREMENT_DIM: 3
+NUM_ITERATIONS: 1
+NUM_MEASUREMENTS: 1

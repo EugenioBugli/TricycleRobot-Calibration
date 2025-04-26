@@ -13,15 +13,17 @@ INITIAL_K_TRACT = conf["INITIAL_K_TRACT"]
 INITIAL_AXIS_LENGTH = conf["INITIAL_AXIS_LENGTH"]
 INITIAL_STEER_OFFSET = conf["INITIAL_STEER_OFFSET"]
 
-LASER_WRT_BASE_X = conf["LASER_WRT_BASE_X"]
-LASER_WRT_BASE_ANGLE = conf["LASER_WRT_BASE_ANGLE"]
-
+INITIAL_LASER_WRT_BASE_X = conf["INITIAL_LASER_WRT_BASE_X"]
+INITIAL_LASER_WRT_BASE_Y = conf["INITIAL_LASER_WRT_BASE_Y"]
+INITIAL_LASER_WRT_BASE_ANGLE = conf["INITIAL_LASER_WRT_BASE_ANGLE"]
 class Tricycle:
     def __init__(self, initial_pose):
 
         self.pose = initial_pose # x, y, theta
         self.sensor_pose = np.array([ # pose with respect to the robot
-            LASER_WRT_BASE_X, 0, LASER_WRT_BASE_ANGLE
+            INITIAL_LASER_WRT_BASE_X,
+            INITIAL_LASER_WRT_BASE_Y,
+            INITIAL_LASER_WRT_BASE_ANGLE
         ])
         self.kinematic_parameters = {
             "K_STEER": INITIAL_K_STEER,
