@@ -1,7 +1,7 @@
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
-from TricycleRobotCalibration.Utils.utils import getRotationMatrix
+from TricycleRobotCalibration.Utils.utils import getRotationMatrix, v2T
 
 utils_dir = Path(__file__).resolve().parents[2]
 
@@ -61,16 +61,18 @@ class Dataset:
 
 		fig, axs = plt.subplots(1,3)
 
-		axs[0].scatter(x_rob, y_rob, color="yellowgreen", label="Robot Odometry")
-		axs[1].scatter(x_sens_wrt_r, y_sens_wrt_r, color="darkorange", label="Sensor wrt Robot RF")
-		#axs[2].scatter(x_sens_wrt_w, y_sens_wrt_w, color="cornflowerblue", label="Sensor wrt World RF")
+		axs[0].scatter(x_rob, y_rob, color="royalblue", label="Robot Odometry")
+		axs[1].scatter(x_sens_wrt_r, y_sens_wrt_r, color="darkorange", label="Sensor wrt World RF")
+
+		axs[2].scatter(x_rob, y_rob, color="royalblue", label="Robot Odometry")
+		axs[2].scatter(x_sens_wrt_r, y_sens_wrt_r, color="darkorange", label="Sensor")
 
 		axs[0].axis("equal")
 		axs[1].axis("equal")
 		axs[2].axis("equal")
 		axs[0].legend()
 		axs[1].legend()
-		#axs[2].legend()
+		axs[2].legend()
 		fig.set_figheight(5)
 		fig.set_figwidth(18)
 		plt.savefig(PICS_PATH / "initial_data.png")
@@ -102,4 +104,4 @@ class Dataset:
 		
 if __name__ == "__main__":
 	data = Dataset()
-	# data.plotData()
+	data.plotData()

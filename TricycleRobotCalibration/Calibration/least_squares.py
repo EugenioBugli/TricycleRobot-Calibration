@@ -39,17 +39,21 @@ def boxPlus(X, delta_x):
     ))
 
 def boxMinus(h, Z):
-    # h is the prediction given by the model aka the pose of the sensor wrt the world 
-    # Z is the measurement of the pose of the sensor wrt the world
-    return T2v(np.linalg.inv(v2T(Z.flatten())) @ v2T(h.flatten()))
+    # h is the prediction given by the model aka how much the robot moved from one instant to the other (you need also apply transformation for the sensor)
+    # Z is the measurement aka how much the sensor moved from instant to the other
+    return T2v(np.linalg.inv(v2T(h.flatten())) @ v2T(Z.flatten()))
 
 def computeError(prediction, measurement):
     # prediction boxminus measurement
     return boxMinus(prediction, measurement)
 
-def computeJacobian(error):
+def computeJacobian(error, x, epsilon=1e-6):
     # jacobian of the error wrt to the state calculated in the actual state
-    return jacobian(error)
+    # you need to compute the numeric jacobian
+    return None
+
+def predictionFunction(current_movement, sensor_pose_wrt_robot):
+    return np.linalg.inv(sensor_pose_wrt_robot) @ current_movement @ sensor_pose_wrt_robot
 
 def leastSquares(data, robot):
     print("Init Least Squares Algo")
@@ -75,10 +79,15 @@ def leastSquares(data, robot):
             
             # this should be my prediction function 
             _, steer_tick, tract_tick, next_tract_tick, meas = data.getMeasurement(j)
-            dx, dy, dtheta, _ = robot.ModelPrediction(steer_tick, tract_tick, next_tract_tick)
-            pred_robot_pose = np.array([[dx, dy, dtheta]])
-            robot.updatePose(pred_robot_pose)
-            pred = robot.Robot2Sensor()
+            dx, dy, dtheta, _ = robot.ModelPrediction(steer_tick, tract_tick, next_tract_tick) # how much you have moved from one state to the other
+            current_movement = np.array([[dx, dy, dtheta]])
+            sensor_pose_wrt_robot = robot.sensor_pose
+            current_prediction = predictionFunction(current_movement, sensor_pose_wrt_robot)
+            
+            
+            robot.updatePose(current_movement)
+            sensor_pose_wrt_robot = robot.Robot2Sensor()
+
             ######
 
             # the measurement is given by the amount 
@@ -111,13 +120,13 @@ def leastSquares(data, robot):
             for the sensor pose: X_s <- X_s @ v2T(delta_x_s)
 
     MEASUREMENT:
-        Z: {sensor pose given by odometry of the sensor} = {x_s y_s theta_s} belongs to SE(2)
+        Z: {difference btw sensor pose given by odometry of the sensor at instant i+1 and instant i} = {x_s y_s theta_s} belongs to SE(2)
         delta_z: {x_s y_s theta_s} euclidean param needed
         box_minus:
-            v2T(delta_z) <- Z'@ Z TODO finish this
+            v2T(delta_z) <- Z^{i+1}' @ Z^{i} TODO
 """
 # > State (kinematic_param | sensor_pose) = [Ksteer Ktract axis_length steer_offset | x_sens y_sens theta_sens]
-# > Measurements --> position of the sensor wrt the robot
+# > Measurements --> how much the sensor moved from one step to the other
 
 if __name__ == "__main__":
     data = Dataset()
