@@ -1,4 +1,3 @@
-import os
 import numpy as np
 from pathlib import Path
 from yaml import safe_load
@@ -92,11 +91,13 @@ class Pose:
         self.x = x
         self.y = y
         self.theta = theta
-
-    def __init__(self, T: np.array):
-        self.x = T[0, 2]
-        self.y = T[1, 2]
-        self.theta = np.arctan2(T[1, 2], T[0, 2])
+        
+    @classmethod
+    def from_transformation(cls, T: np.ndarray):
+        x = T[0, 2]
+        y = T[1, 2]
+        theta = np.arctan2(T[1, 0], T[0, 0])
+        return cls(x, y, theta)
 
     def to_vector(self):
         return np.array([self.x , self.y, self.theta])
@@ -125,14 +126,14 @@ class Tricycle:
         }
         # relative pose, not a global one!
         self.relative_sensor_pose = Pose(INITIAL_LASER_WRT_BASE_X, 
-                                INITIAL_LASER_WRT_BASE_Y, 
-                                INITIAL_LASER_WRT_BASE_ANGLE)
+                                         INITIAL_LASER_WRT_BASE_Y, 
+                                         INITIAL_LASER_WRT_BASE_ANGLE)
     
     def updatePose(self, new_pose: Pose):
         # set the pose to the new value, which is a relative value
         r_T_m = new_pose.to_transformation() # movement wrt the robot RF
         w_T_r = self.global_pose.to_transformation() # robot wrt world RF
-        self.pose = w_T_r @ r_T_m
+        self.global_pose = Pose.from_transformation(w_T_r @ r_T_m)
     
     def updateKinematicParam(self, K_steer, K_tract, axis_length, steer_offset):
         self.kinematic_parameters = {
@@ -175,6 +176,7 @@ class Dataset:
 if __name__ == "__main__":
     print("Check if everything works")
     dataset = Dataset(DATASET_PATH)
+    robot = Tricycle(Pose(0.0, 0.0, 0.0))
 
     fig, axs = plt.subplots(1,2)
 
@@ -192,5 +194,38 @@ if __name__ == "__main__":
     fig.set_figwidth(18)
 
     plt.savefig(PICS_PATH / "initial_plot.png")
+    # plt.show()
+    plt.close()
+
+    print("Testing the prediction given by the Model")
+    prediction = np.zeros((dataset.length, 2))
+    for i in range(dataset.length-1):
+
+        steer_tick = dataset.steer_ticks[i]
+        current_tract_tick = dataset.tract_ticks[i]
+        next_tract_tick = dataset.tract_ticks[i+1]
+
+        dx, dy, dtheta, dphi = robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick)
+
+        robot.updatePose(Pose(dx, dy, dtheta))
+        print("New pose: ", robot.global_pose.to_vector())
+        prediction[i] = robot.global_pose.to_vector()[:2]
+        
+    fig, axs = plt.subplots(1,2)
+
+    axs[0].scatter(dataset.robot_poses[:, 0], dataset.robot_poses[:, 1], color="firebrick", label="Robot Pose (Dataset)")
+    axs[1].scatter(prediction[:, 0], prediction[:, 1], color="forestgreen", label="Robot Pose (Model)")
+
+    axs[0].legend()
+    axs[1].legend()
+
+    axs[0].set_xlabel("X")
+    axs[0].set_ylabel("Y")
+    axs[1].set_xlabel("X")
+    axs[1].set_ylabel("Y")
+    fig.set_figheight(5)
+    fig.set_figwidth(18)
+
+    plt.savefig(PICS_PATH / "prediction_vs_gt.png")
     plt.show()
     plt.close()
