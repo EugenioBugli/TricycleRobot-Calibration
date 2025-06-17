@@ -1,18 +1,23 @@
 import numpy as np
 from pathlib import Path
+from yaml import safe_load
 import matplotlib.pyplot as plt
 from TricycleRobotCalibration.Utils.Utils import Pose, Tricycle, Dataset
 
-assets_dir = Path(__file__).resolve().parents[2]
+config_dir = Path(__file__).resolve().parents[1]
+assets_dir = config_dir.resolve.parent
+
+with open(config_dir / 'config.yml', 'r') as file:
+    conf = safe_load(file)
+
+STATE_DIM = conf["STATE_DIM"]
+MEASUREMENT_DIM = conf["MEASUREMENT_DIM"]
+NUM_ITERATIONS = conf["NUM_ITERATIONS"]
+DATA_SIZE = conf["DATA_SIZE"]
+EPSILON = conf["EPSILON"]
 
 DATASET_PATH = assets_dir / "Data" / "dataset.txt"
 PICS_PATH = assets_dir / "Pics"
-
-STATE_DIM = 7
-MEASUREMENT_DIM = 3
-NUM_ITERATIONS = 10
-DATA_SIZE = 2434
-EPSILON = 1e-8
 
 def box_plus(X: np.array, delta_x: np.array):
     """
