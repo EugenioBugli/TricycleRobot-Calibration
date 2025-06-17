@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from TricycleRobotCalibration.Utils.Utils import Pose, Tricycle, Dataset
 
 config_dir = Path(__file__).resolve().parents[1]
-assets_dir = config_dir.resolve.parent
+assets_dir = config_dir.resolve().parent
 
 with open(config_dir / 'config.yml', 'r') as file:
     conf = safe_load(file)
@@ -29,9 +29,9 @@ def box_plus(X: np.array, delta_x: np.array):
     delta_x_euclidean, delta_x_manifold = delta_x[:4], Pose.from_vector(delta_x[4:])
 
     euclidean_part = X_euclidean + delta_x_euclidean
-    manifold_part = X_manifold @ delta_x_manifold
+    manifold_part = Pose.from_vector(X_manifold @ delta_x_manifold)
     
-    return np.vstack((euclidean_part, manifold_part))
+    return np.vstack((euclidean_part, manifold_part.to_vector()))
 
 def box_minus(P: Pose, M: Pose):
     """
@@ -41,10 +41,21 @@ def box_minus(P: Pose, M: Pose):
     return Pose.from_transformation(np.linalg.inv(M.to_transformation()) @ P.to_transformation())
 
 def get_observation(current_meas: Pose, next_meas: Pose):
+    """
+        observed transformation
+        > current_meas: actual measurement
+        > next_meas: new measurement
+    """
     # our observation it's defined as "how much the robot has moved from the last measurement"
-    return np.linalg.inv(current_meas.to_transformation()) @ next_meas.to_transformation()
+    T_inv = np.linalg.inv(current_meas.to_transformation())
+    return Pose.from_transformation(T_inv @ next_meas.to_transformation())
 
 def get_prediction(robot_sensor_pose: Pose, movement: Pose):
+    """
+        > robot_sensor_pose: sensor pose relative to the robot --> what I want to calibrate
+        > movement: actual motion performed from the robot (via model_prediction)
+    """
+    # prediction of the sensor motion
     return np.linalg.inv(robot_sensor_pose.to_transformation()) @ movement.to_transformation() @ robot_sensor_pose.to_transformation()
 
 class LS:
@@ -66,8 +77,8 @@ class LS:
             h: {displacement of the sensor after one step of the model prediction}
     """
     def __init__(self, initial_pose: Pose, data_path: str):
-        self.H = np.zeros((MEASUREMENT_DIM, STATE_DIM, DATA_SIZE))
-        self.b = np.zeros((MEASUREMENT_DIM, 1, DATA_SIZE))
+        self.H = np.zeros((MEASUREMENT_DIM, STATE_DIM, NUM_ITERATIONS))
+        self.b = np.zeros((MEASUREMENT_DIM, 1, NUM_ITERATIONS))
         self.omega = np.eye(MEASUREMENT_DIM)
 
         self.error = np.zeros((MEASUREMENT_DIM, 1))
@@ -76,16 +87,16 @@ class LS:
         self.dataset = Dataset(data_path)
         self.robot = Tricycle(initial_pose)
 
-    def get_error(self, prediction: Pose, measurement: Pose):
+    def get_error(self, sensor_movement_prediction: Pose, robot_measured_movement: Pose):
         """
             Use this function to compute the error between the predicition and the measurement
 
-            > prediction: how much the robot has moved from the prediction model
-            > measurement: how much the model has moved from the last measurement
+            > sensor_movement_prediction: how much the sensor has moved from the prediction model
+            > robot_measured_movement: how much the robot has moved from the last measurement
 
             error dimension is 3x1
         """
-        return box_minus(prediction, measurement)
+        return box_minus(sensor_movement_prediction, robot_measured_movement)
     
     def get_jacobian(self, param_plus: np.array, param_minus: np.array, measurement: np.array):
         """
@@ -123,13 +134,14 @@ class LS:
             for j in range(DATA_SIZE-1):
                 _, steer_tick, current_tract_tick, next_tract_tick, sensor_pose = self.dataset.get_measurement(j)
 
-                # this is the prediction of the model
-                dx, dy, dtheta, dphi = self.robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick)
-                # this is the prediction function
-                measurement = Pose(dx, dy, dtheta)
-                prediction = get_prediction(sensor_pose, measurement)
+                # this is the movement of the robot
+                dx, dy, dtheta, _ = self.robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick)
 
-                self.error = self.get_error(prediction, measurement)
+                robot_measured_movement = Pose(dx, dy, dtheta)
+                sensor_movement_prediction = get_prediction(sensor_pose, robot_measured_movement)
+
+                self.error = self.get_error(sensor_movement_prediction, robot_measured_movement)
+
                 param_plus = np.array([steer_tick + EPSILON, 
                                        current_tract_tick + EPSILON, 
                                        next_tract_tick + EPSILON, 
