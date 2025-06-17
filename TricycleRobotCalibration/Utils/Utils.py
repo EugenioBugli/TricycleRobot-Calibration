@@ -98,6 +98,13 @@ class Pose:
         y = T[1, 2]
         theta = np.arctan2(T[1, 0], T[0, 0])
         return cls(x, y, theta)
+    
+    @classmethod
+    def from_vector(cls, v: np.ndarray):
+        x = v[0]
+        y = v[1]
+        theta = v[2]
+        return cls(x, y, theta)
 
     def to_vector(self):
         return np.array([self.x , self.y, self.theta])
@@ -162,7 +169,7 @@ class Tricycle:
     
 class Dataset:
      
-     def __init__(self, data_path: str):
+    def __init__(self, data_path: str):
         raw_data = openData(data_path)
 
         # shapes will be (N, relative dimension)
@@ -172,6 +179,9 @@ class Dataset:
         self.robot_poses = raw_data["model_poses"]
         self.sensor_poses = raw_data["sensor_poses"]
         self.length = self.time.shape[0]
+    
+    def get_measurement(self, idx):
+        return self.robot_poses[idx], self.steer_ticks[idx], self.tract_ticks[idx], self.tract_ticks[idx+1], self.sensor_poses[idx]
     
 if __name__ == "__main__":
     print("Check if everything works")
