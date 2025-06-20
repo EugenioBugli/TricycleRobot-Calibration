@@ -19,140 +19,151 @@ EPSILON = conf["EPSILON"]
 DATASET_PATH = assets_dir / "Data" / "dataset.txt"
 PICS_PATH = assets_dir / "Pics"
 
-def box_plus(X: np.array, delta_x: np.array):
+class State:
     """
-        > X: [kinematic_parameters | sensor pose]
-        > delta_x: [kinematic_parameters | sensor pose]
+        X: {kinematic parameters | sensor pose relative to the robot} \in R^{4} \times SE(2)
+        delta_x: {K_steer K_tract axis_length steer_offset | r_x_s r_y_s r_theta_s} euclidean param needed only for the sensor
+
+        box_plus:
+            for the kinematic parameter: X_k <--- X_k + delta_x_k
+            for the sensor pose: X_s <--- X_s @ v2T(delta_x_s)
     """
+    def __init__(self, kinem_param: np.array, sensor_pose: Pose):
+        self.kinem_param = kinem_param
+        self.sensor_pose = sensor_pose
 
-    X_euclidean, X_manifold = X[:4], Pose.from_vector(X[4:])
-    delta_x_euclidean, delta_x_manifold = delta_x[:4], Pose.from_vector(delta_x[4:])
+    @classmethod
+    def box_plus(cls, X, delta_x): 
 
-    euclidean_part = X_euclidean + delta_x_euclidean
-    manifold_part = Pose.from_vector(X_manifold @ delta_x_manifold)
+        new_kinem_param = X.kinem_param + delta_x.kinem_param
+        new_sensor_pose = Pose.from_transformation(
+            X.sensor_pose.to_transformstion() @ delta_x.sensor_to_pose.to_transformation())
+        
+        return cls(new_kinem_param, new_sensor_pose)
     
-    return np.vstack((euclidean_part, manifold_part.to_vector()))
+    @classmethod
+    def box_minus(cls, X, Y):
 
-def box_minus(P: Pose, M: Pose):
+        X_inv = np.linalg.inv(X.sensor_pose.to_transformation())
+        new_kinem_param = X.kinem_param - Y.kinem_param
+        new_sensor_pose = Pose.from_transformation(
+            X_inv @ Y.sensor_to_pose.to_transformation())
+        
+        return cls(new_kinem_param, new_sensor_pose)
+    
+class Measurement:
     """
-        > P: prediction
-        > M: measurement
-    """
-    return Pose.from_transformation(np.linalg.inv(M.to_transformation()) @ P.to_transformation())
+        Z \in SE(2)
 
-def get_observation(current_meas: Pose, next_meas: Pose):
-    """
-        observed transformation
-        > current_meas: actual measurement
-        > next_meas: new measurement
-    """
-    # our observation it's defined as "how much the robot has moved from the last measurement"
-    T_inv = np.linalg.inv(current_meas.to_transformation())
-    return Pose.from_transformation(T_inv @ next_meas.to_transformation())
+        The measurements represent the pose of the sensor with respect to the World frame.
+        The box minus operation is needed since the quantities belong to SE(2).
 
-def get_prediction(robot_sensor_pose: Pose, movement: Pose):
+        The observation is defined as the relative transformation between two measurements, which tells me
+        how much the sensor moved from instant [i] to instant [i+1]
     """
-        > robot_sensor_pose: sensor pose relative to the robot --> what I want to calibrate
-        > movement: actual motion performed from the robot (via model_prediction)
+    def __init__(self, sensor_pose: Pose):
+        self.sensor_pose = sensor_pose
+
+    @classmethod
+    def box_minus(model_prediction: Pose, measurement: Pose):
+        inv_measurement = np.linalg.inv(measurement.to_transformation())
+        return Pose.from_transformation(inv_measurement @ model_prediction)
+    
+    @classmethod
+    def get_observation(current_measurement: Pose, new_measurement: Pose):
+        inv_current_measurement = np.linalg.inv(current_measurement.to_transformation())
+        return Pose.from_transformation(inv_current_measurement @ new_measurement.to_transformation())
+
+def prediction_function(sensor_pose: Pose, delta_sensor: Pose):
     """
-    # prediction of the sensor motion
-    return np.linalg.inv(robot_sensor_pose.to_transformation()) @ movement.to_transformation() @ robot_sensor_pose.to_transformation()
+        This is the definition of the prediction function.
+
+        > sensor_pose: relative pose of the sensor wrt the robot in the current state
+        > delta_sensor: actual motion of the robot (via model_prediction)
+    """
+    inv_current_sensor_pose = np.linalg.inv(sensor_pose.to_transformation())
+
+    return Pose.from_transformation(inv_current_sensor_pose @ delta_sensor.to_transformation() @ sensor_pose.to_transformation())
+
 
 class LS:
-    """
-        STATE:
-            X: {kinematic parameters | sensor pose relative to the robot} = 4 values that belongs to R and one that belongs to SE(2)
-            delta_x: {K_steer K_tract axis_length steer_offset | r_x_s r_y_s r_theta_s} euclidean param needed only for the sensor
-            box_plus:
-                for the kinematic parameter: X_k <--- X_k + delta_x_k
-                for the sensor pose: X_s <--- X_s @ v2T(delta_x_s)
 
-        MEASUREMENT:
-            Z: {difference btw sensor pose given by odometry of the sensor at instant i+1 and instant i} = {x_s y_s theta_s} belongs to SE(2)
-            delta_z: {x_s y_s theta_s} euclidean param needed
-            box_minus:
-                v2T(delta_z) <- Z^{i+1}' @ Z^{i} TODO
-
-        PREDICTION:
-            h: {displacement of the sensor after one step of the model prediction}
-    """
     def __init__(self, initial_pose: Pose, data_path: str):
-        self.H = np.zeros((MEASUREMENT_DIM, STATE_DIM, NUM_ITERATIONS))
-        self.b = np.zeros((MEASUREMENT_DIM, 1, NUM_ITERATIONS))
+        self.dataset = Dataset(data_path)
+        self.robot = Tricycle(initial_pose)
+        
         self.omega = np.eye(MEASUREMENT_DIM)
 
         self.error = np.zeros((MEASUREMENT_DIM, 1))
         self.Jacobian = np.zeros((MEASUREMENT_DIM, STATE_DIM))
 
-        self.dataset = Dataset(data_path)
-        self.robot = Tricycle(initial_pose)
 
-    def get_error(self, sensor_movement_prediction: Pose, robot_measured_movement: Pose):
+    def get_error(self, prediction: Pose, observation: Pose):
         """
-            Use this function to compute the error between the predicition and the measurement
+            Use this function to compute the error between the predicition and the observation
 
-            > sensor_movement_prediction: how much the sensor has moved from the prediction model
-            > robot_measured_movement: how much the robot has moved from the last measurement
+            > prediction: how much the sensor has moved from the prediction model
+            > observation: how much the sensor has moved from the last measurement
 
-            error dimension is 3x1
+            The dimension is [MEASUREMENT_DIM, 1] = [3, 1]
         """
-        return box_minus(sensor_movement_prediction, robot_measured_movement)
-    
-    def get_jacobian(self, param_plus: np.array, param_minus: np.array, measurement: np.array):
+        self.error = Measurement.box_minus(prediction, observation)
+
+
+    def get_jacobian(self, X: State, delta_x: State, observation: Pose):
         """
-            Use this function to compute the jacobian of the error with respect to the state
+            > X: current state
+            > delta_x: how much the robot has moved (via model_prediction)
+            > observation: how much the sensor has moved
 
-            > error: difference between how much the robot has moved from the prediction model 
-                        and how much has moved from the last measurement
-            > x: current state estimate
-        
-            The complete jacobian has a dimension (3,7) where the first 4 columns are related to
-            the kinematic parameters, while the remaining ones to the sensor pose. The first block
-            does not need the use of boxplus and boxminus since the quantities are already euclidean,
-            while the second block uses them.
-
-            error dimension is 3x1
+            The complete jacobian has a dimension [MEASUREMENT_DIM, STATE_DIM] = [3, 7] where the first 4 columns are related to
+            the kinematic parameters, while the remaining ones to the sensor pose.
         """
-        # Compute the numerical jacobian
-        euclidean_plus, manifold_plus = param_plus[:4], Pose.from_vector(param_plus[4:])
-        euclidean_minus, manifold_minus = param_minus[:4], Pose.from_vector(param_minus[4:])
 
-        # get the error 
-        
-        error_plus_euclidean, error_plus_manifold = self.get_error(param_plus, measurement)
-        error_minus_euclidean, error_minus_manifold = self.get_error(param_minus, measurement) 
-        # euclidean quantities: (euclidean_plus - euclidean_minus)/2*EPSILON
-        J_euclidean = (error_plus_euclidean - error_minus_euclidean)/2*EPSILON
-        J_manifold = box_minus(error_plus_manifold, error_minus_manifold)/2*EPSILON
+        X_plus = State.box_plus(X, EPSILON*np.ones(STATE_DIM))
+        pred_plus = prediction_function(X_plus.sensor_pose, delta_x)
+        error_plus = self.get_error(pred_plus, observation)
 
-        # manifold quantities: euclidean
+        X_minus = State.box_minus(X, EPSILON*np.ones(STATE_DIM))
+        pred_minus = prediction_function(X_minus.sensor_pose, delta_x)
+        error_minus = self.get_error(pred_minus, observation)
 
-        return J_euclidean, J_manifold
+        self.Jacobian = (error_plus - error_minus)/(2*EPSILON)
 
     def run(self):
         for i in range(NUM_ITERATIONS):
+            H = np.zeros((STATE_DIM, STATE_DIM))
+            b = np.zeros((STATE_DIM, 1))
             for j in range(DATA_SIZE-1):
+
+                X = State(
+                    kinem_param=np.array(list(self.robot.kinematic_parameters.values)),
+                    sensor_pose=self.robot.relative_sensor_pose
+                )
                 _, steer_tick, current_tract_tick, next_tract_tick, sensor_pose = self.dataset.get_measurement(j)
 
                 # this is the movement of the robot
-                dx, dy, dtheta, _ = self.robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick)
+                dx, dy, dtheta, delta_phi = self.robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick)
+                delta_x = Pose(dx, dy, dtheta) # movement via model_prediction
 
-                robot_measured_movement = Pose(dx, dy, dtheta)
-                sensor_movement_prediction = get_prediction(sensor_pose, robot_measured_movement)
+                # my observation --> how much the sensor moved
+                sensor_pose_measurement = Measurement(sensor_pose)
+                # TODO get the previous measurement of the sensor pose
+                sensor_movement_observation = Measurement.get_observation(sensor_pose_measurement, prev_measurement)
+                sensor_movement_prediction = prediction_function(X.sensor_pose, delta_x)
 
-                self.error = self.get_error(sensor_movement_prediction, robot_measured_movement)
+                # compute the error and the jacobian
+                self.get_error(sensor_movement_prediction, sensor_movement_observation)
+                self.get_jacobian(X, delta_x, sensor_movement_observation)
 
-                param_plus = np.array([steer_tick + EPSILON, 
-                                       current_tract_tick + EPSILON, 
-                                       next_tract_tick + EPSILON, 
-                                       box_plus(sensor_pose, 
-                                                Pose(EPSILON, EPSILON, EPSILON))])
-                
-                param_minus = np.array([steer_tick - EPSILON, 
-                                        current_tract_tick - EPSILON,
-                                        next_tract_tick - EPSILON, 
-                                        box_minus(sensor_pose, 
-                                                  Pose(EPSILON, EPSILON, EPSILON))])
-                self.Jacobian = self.get_jacobian(param_plus, param_minus)
+                H += self.Jacobian.T @ self.omega @ self.Jacobian
+                b += self.Jacobian.T @ self.omega @ self.error
 
-        return None
+            # solution
+            # TODO check types
+            delta = -np.linalg.solve(H, b)
+            X_star = State.box_plus(X, delta)
+
+            # update parameters
+            self.robot.kinematic_parameters = X_star.kinem_param
+            self.robot.relative_sensor_pose = X_star.sensor_pose

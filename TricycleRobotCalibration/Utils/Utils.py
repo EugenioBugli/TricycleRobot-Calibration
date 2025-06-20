@@ -136,13 +136,13 @@ class Tricycle:
                                          INITIAL_LASER_WRT_BASE_Y, 
                                          INITIAL_LASER_WRT_BASE_ANGLE)
     
-    def updatePose(self, new_pose: Pose):
+    def update_pose(self, new_pose: Pose):
         # set the pose to the new value, which is a relative value
         r_T_m = new_pose.to_transformation() # movement wrt the robot RF
         w_T_r = self.global_pose.to_transformation() # robot wrt world RF
         self.global_pose = Pose.from_transformation(w_T_r @ r_T_m)
     
-    def updateKinematicParam(self, K_steer, K_tract, axis_length, steer_offset):
+    def update_kinematic_param(self, K_steer, K_tract, axis_length, steer_offset):
         self.kinematic_parameters = {
             "K_STEER": K_steer,
             "K_TRACT": K_tract,
