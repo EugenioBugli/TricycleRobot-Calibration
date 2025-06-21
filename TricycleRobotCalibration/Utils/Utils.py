@@ -181,7 +181,7 @@ class Dataset:
         self.length = self.time.shape[0]
     
     def get_measurement(self, idx):
-        return self.robot_poses[idx], self.steer_ticks[idx], self.tract_ticks[idx], self.tract_ticks[idx+1], self.sensor_poses[idx]
+        return self.robot_poses[idx], self.steer_ticks[idx], self.tract_ticks[idx], self.tract_ticks[idx+1], self.sensor_poses[idx], self.sensor_poses[idx+1]
     
 if __name__ == "__main__":
     print("Check if everything works")
