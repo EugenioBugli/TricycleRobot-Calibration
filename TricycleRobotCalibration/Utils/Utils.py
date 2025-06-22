@@ -39,7 +39,8 @@ def openData(data_path):
 		tokens = l.split(":") 
 		current_sensor_pose = list(map(float, tokens[-1].strip().split(" ")))
 		current_timestamp = float(tokens[1].strip().strip().split(" ")[0])
-		current_ticks = list(map(float, tokens[2].strip().split(" ")[:2])) # here I have first the absolute encoder tick then the incremental one
+        # here I have first the absolute encoder tick then the incremental one
+		current_ticks = [np.uint32(int(x)) for x in tokens[2].strip().split(" ")[:2] ] 
 		
         # due to the structure of the dataset, the robot model string has a variable structure
 		robot_pose_with_garbage = []
@@ -56,26 +57,28 @@ def openData(data_path):
 
 	return {
 		"time": np.asarray(time).reshape(-1,1), 
-		"ticks": np.asarray(ticks), 
+		"ticks": np.asarray(ticks, dtype=np.uint32), 
 		"model_poses": np.asarray(model_poses), 
 		"sensor_poses": np.asarray(sensor_poses)}
 
-def get_steering_angle(tick, K_steer):
+def get_steering_angle(tick, K_steer, steer_offset):
     # ABSOLUTE Encoder
 
-    if tick > MAX_STEER_TICK/2:
-        s = tick - MAX_STEER_TICK
+    abs_ticks = np.int64(tick)
+
+    if abs_ticks > np.int64(MAX_STEER_TICK) // 2:
+        s = abs_ticks - np.int64(MAX_STEER_TICK)
     else:
-        s = tick
+        s = abs_ticks
 
     angle = s * K_steer
 
-    return (2*np.pi/MAX_STEER_TICK) * angle
+    return ((2*np.pi/MAX_STEER_TICK) * angle) + steer_offset
 
 def get_traction_distance(tick, next_tick, K_tract):
     # INCREMENTAL Encoder
     # tick and next_tick are uint32 values
-    t = next_tick - tick
+    t = np.int64(next_tick) - np.int64(tick)
 
     # fix possible overflow
     if t > MAX_INT_32:
@@ -155,14 +158,16 @@ class Tricycle:
         K_steer = self.kinematic_parameters["K_STEER"]
         K_tract = self.kinematic_parameters["K_TRACT"] 
         axis_length = self.kinematic_parameters["AXIS_LENGTH"]
+        steer_offset = self.kinematic_parameters["STEER_OFFSET"]
 
-        steering_angle = get_steering_angle(steer_tick, K_steer)
+        steering_angle = get_steering_angle(steer_tick, K_steer, steer_offset)
         traction_distance = get_traction_distance(current_tract_tick, next_tract_tick, K_tract)
 
         # this is the kinematic model of the robot with the elimination of dt
-        dx = np.cos(steering_angle)*np.cos(self.global_pose.theta) * traction_distance
-        dy = np.cos(steering_angle)*np.sin(self.global_pose.theta) * traction_distance
+        # apply dtheta rather than self.global_pose.theta to obtain a local movement
         dtheta = (np.sin(steering_angle) / axis_length) * traction_distance
+        dx = np.cos(steering_angle)*np.cos(dtheta) * traction_distance
+        dy = np.cos(steering_angle)*np.sin(dtheta) * traction_distance
         dphi = steering_angle
 
         return dx.item(), dy.item(), dtheta.item(), dphi.item()
@@ -174,8 +179,8 @@ class Dataset:
 
         # shapes will be (N, relative dimension)
         self.time = raw_data["time"]
-        self.tract_ticks = raw_data["ticks"][:, 0:1]
-        self.steer_ticks = raw_data["ticks"][:, 1:2]
+        self.steer_ticks = raw_data["ticks"][:, 0:1]
+        self.tract_ticks = raw_data["ticks"][:, 1:2]
         self.robot_poses = raw_data["model_poses"]
         self.sensor_poses = raw_data["sensor_poses"]
         self.length = self.time.shape[0]
@@ -211,14 +216,11 @@ if __name__ == "__main__":
     prediction = np.zeros((dataset.length, 2))
     for i in range(dataset.length-1):
 
-        steer_tick = dataset.steer_ticks[i]
-        current_tract_tick = dataset.tract_ticks[i]
-        next_tract_tick = dataset.tract_ticks[i+1]
+        _, steer_tick, current_tract_tick, next_tract_tick, _, _ = dataset.get_measurement(i)
 
         dx, dy, dtheta, dphi = robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick)
 
-        robot.updatePose(Pose(dx, dy, dtheta))
-        print("New pose: ", robot.global_pose.to_vector())
+        robot.update_pose(Pose(dx, dy, dtheta))
         prediction[i] = robot.global_pose.to_vector()[:2]
         
     fig, axs = plt.subplots(1,2)
