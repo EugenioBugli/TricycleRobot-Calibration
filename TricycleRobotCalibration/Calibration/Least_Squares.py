@@ -240,9 +240,17 @@ class LS:
 
             chi_square[i] = chi_iteration
 
-            H += np.diag([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) # Regularization factor ???
+            H += 5*np.diag([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) # Regularization factor ???
 
-            delta = -np.linalg.solve(H, b).ravel()
+            try:
+                # converge faster bu has singularity problems
+                delta = np.linalg.solve(H, -b).ravel()
+
+            except np.linalg.LinAlgError:
+                # slower but no singularity problems
+                delta, _, _, _ = np.linalg.lstsq(H, -b, rcond=None)
+                delta = delta.ravel()
+
             X_star = State.box_plus(X, State(delta[:4], Pose.from_vector(delta[4:])))
 
             # update parameters
