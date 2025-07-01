@@ -267,8 +267,8 @@ if __name__ == "__main__":
     result = algo.run()
     print(f"Result {result}")
 
-    sensor_calibrated = np.zeros((DATA_SIZE, 2))
-    sensor_uncalibrated = np.zeros((DATA_SIZE, 2))
+    sensor_calibrated = np.zeros((DATA_SIZE-1, 2))
+    sensor_uncalibrated = np.zeros((DATA_SIZE-1, 2))
     uncalibrated_robot = Tricycle(initial_pose=Pose(0.0, 0.0, 0.0))   
     for i in range(DATA_SIZE-1):
 
@@ -301,11 +301,14 @@ if __name__ == "__main__":
 
     axs[0].legend()
     axs[1].legend()
+    axs[2].legend()
 
     axs[0].set_xlabel("X")
     axs[0].set_ylabel("Y")
     axs[1].set_xlabel("X")
     axs[1].set_ylabel("Y")
+    axs[2].set_xlabel("X")
+    axs[2].set_ylabel("Y")
     fig.set_figheight(5)
     fig.set_figwidth(18)
 
