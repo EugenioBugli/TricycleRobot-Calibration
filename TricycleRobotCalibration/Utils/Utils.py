@@ -94,7 +94,13 @@ class Pose:
         self.x = x
         self.y = y
         self.theta = theta
-        
+
+    def __repr__(self):
+        return f"Pose: {self.x}, {self.y}, {self.theta}"
+    
+    def __str__(self):
+        return f"Pose: {self.x}, {self.y}, {self.theta}"
+            
     @classmethod
     def from_transformation(cls, T: np.ndarray):
         x = T[0, 2]
@@ -145,20 +151,21 @@ class Tricycle:
         w_T_r = self.global_pose.to_transformation() # robot wrt world RF
         self.global_pose = Pose.from_transformation(w_T_r @ r_T_m)
     
-    def update_kinematic_param(self, K_steer, K_tract, axis_length, steer_offset):
-        self.kinematic_parameters = {
-            "K_STEER": K_steer,
-            "K_TRACT": K_tract,
-            "AXIS_LENGTH": axis_length,
-            "STEER_OFFSET": steer_offset,
-        }
+    def update_kinematic_param(self, K_steer, K_tract, axis_length, steer_offset):  
+        self.kinematic_parameters["K_STEER"] = K_steer
+        self.kinematic_parameters["K_TRACT"] = K_tract
+        self.kinematic_parameters["AXIS_LENGTH"] = axis_length
+        self.kinematic_parameters["STEER_OFFSET"] = steer_offset
 
-    def model_prediction(self, steer_tick, current_tract_tick, next_tract_tick):
+    def update_sensor_pose(self, new_pose: Pose):
+        self.relative_sensor_pose = new_pose
 
-        K_steer = self.kinematic_parameters["K_STEER"]
-        K_tract = self.kinematic_parameters["K_TRACT"] 
-        axis_length = self.kinematic_parameters["AXIS_LENGTH"]
-        steer_offset = self.kinematic_parameters["STEER_OFFSET"]
+    def calibrate_parameters(self, K_steer, K_tract, axis_length, steer_offset, new_pose: Pose):
+        self.update_kinematic_param(K_steer, K_tract, axis_length, steer_offset)
+        self.update_sensor_pose(new_pose)
+
+    def model_prediction(self, steer_tick, current_tract_tick, next_tract_tick, 
+                         K_steer, K_tract, axis_length, steer_offset):
 
         steering_angle = get_steering_angle(steer_tick, K_steer, steer_offset)
         traction_distance = get_traction_distance(current_tract_tick, next_tract_tick, K_tract)
@@ -218,7 +225,9 @@ if __name__ == "__main__":
 
         _, steer_tick, current_tract_tick, next_tract_tick, _, _ = dataset.get_measurement(i)
 
-        dx, dy, dtheta, dphi = robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick)
+        dx, dy, dtheta, dphi = robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick,
+                                                      robot.kinematic_parameters["K_STEER"], robot.kinematic_parameters["K_TRACT"], 
+                                                      robot.kinematic_parameters["AXIS_LENGTH"], robot.kinematic_parameters["STEER_OFFSET"])
 
         robot.update_pose(Pose(dx, dy, dtheta))
         prediction[i] = robot.global_pose.to_vector()[:2]
