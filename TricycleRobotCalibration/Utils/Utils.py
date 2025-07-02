@@ -203,7 +203,7 @@ if __name__ == "__main__":
     fig, axs = plt.subplots(1,2)
 
     axs[0].scatter(dataset.robot_poses[:, 0], dataset.robot_poses[:, 1], color="royalblue", label="Robot Pose")
-    axs[1].scatter(dataset.sensor_poses[:, 0], dataset.sensor_poses[:, 1], color="darkorange", label="Sensor Pose without Calibration")
+    axs[1].scatter(dataset.sensor_poses[:, 0], dataset.sensor_poses[:, 1], color="darkorange", label="Sensor Pose Measured")
 
     axs[0].legend()
     axs[1].legend()

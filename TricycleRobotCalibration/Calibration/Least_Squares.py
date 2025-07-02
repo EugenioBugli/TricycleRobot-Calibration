@@ -236,11 +236,11 @@ class LS:
                 b += self.Jacobian.T @ self.omega @ self.error.reshape(-1, 1)
                 chi_iteration += self.error.T @ self.error
 
-                self.robot.update_pose(delta_x)
+                # self.robot.update_pose(delta_x)
 
             chi_square[i] = chi_iteration
 
-            H += 5*np.diag([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) # Regularization factor ???
+            H += 3*np.diag([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) # Regularization factor ???
 
             try:
                 # converge faster bu has singularity problems
@@ -265,14 +265,14 @@ class LS:
             print(new_state)
             print(f"Chi iteration: {chi_iteration}")
     
-        return new_state
+        return new_state, chi_square
 
 if __name__ == "__main__":
     print("Start Least Squares")
 
     algo = LS(initial_pose=Pose(0.0, 0.0, 0.0), data_path=DATASET_PATH)
 
-    result = algo.run()
+    result, chi_square = algo.run()
     print(f"Result {result}")
 
     sensor_calibrated = np.zeros((DATA_SIZE-1, 2))
@@ -320,6 +320,39 @@ if __name__ == "__main__":
     fig.set_figheight(5)
     fig.set_figwidth(18)
 
+    plt.savefig(PICS_PATH / "sensor_representations.png")
+    # plt.show()
+    plt.close()
+
+    fig, axs = plt.subplots(1,2)
+
+    axs[0].scatter(algo.dataset.sensor_poses[:, 0], algo.dataset.sensor_poses[:, 1], color="royalblue", label="Sensor Pose Measured (Dataset)")
+    axs[0].scatter(sensor_calibrated[:, 0], sensor_calibrated[:, 1], color="forestgreen", label="Sensor Pose Calibrated")
+    
+    axs[1].scatter(sensor_uncalibrated[:, 0], sensor_uncalibrated[:, 1], color="firebrick", label="Sensor Pose Uncalibrated")
+    axs[1].scatter(sensor_calibrated[:, 0], sensor_calibrated[:, 1], color="forestgreen", label="Sensor Pose Calibrated")
+
+    axs[0].legend()
+    axs[1].legend()
+
+    axs[0].set_xlabel("X")
+    axs[0].set_ylabel("Y")
+
+    axs[1].set_xlabel("X")
+    axs[1].set_ylabel("Y")
+    fig.set_figheight(5)
+    fig.set_figwidth(16)
+
     plt.savefig(PICS_PATH / "sensor_calibration.png")
+    plt.show()
+    plt.close()
+
+    print(np.arange(NUM_ITERATIONS).shape, chi_square.shape)
+    plt.plot(chi_square, color="firebrick")
+    plt.scatter(np.arange(NUM_ITERATIONS), chi_square, color="darkorange", label="Error")
+    plt.legend()
+    plt.xlabel("Time")
+    plt.ylabel("Error")
+    plt.savefig(PICS_PATH / "chi_square.png")
     plt.show()
     plt.close()
