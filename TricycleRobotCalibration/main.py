@@ -29,9 +29,6 @@ MAX_TRACT_TICK = conf["MAX_TRACT_TICKS"]
 MAX_INT_32 = np.iinfo(np.int32).max
 MAX_UINT_32 = np.iinfo(np.uint32).max
 
-DEBUG = False
-OMEGA_WEIGHT = conf["OMEGA_WEIGHT"]
-REGULAR_WEIGHT = conf["REGULAR_WEIGHT"]
 ERROR_THRESHOLD = float(conf["ERROR_THRESHOLD"])
 
 DATASET_PATH = assets_dir / "Data" / "dataset.txt"
@@ -337,7 +334,7 @@ class LS:
                                          INITIAL_LASER_WRT_BASE_Y, 
                                          INITIAL_LASER_WRT_BASE_ANGLE)
         
-        self.omega = OMEGA_WEIGHT*np.eye(MEASUREMENT_DIM)
+        self.omega = np.eye(MEASUREMENT_DIM)
 
     def iteration(self, X: State, current_threshold: float, current_iter: int):
         H = np.zeros((STATE_DIM, STATE_DIM))
@@ -375,8 +372,6 @@ class LS:
             
             chi = error.T @ error
 
-            print(f"Error: {error}")
-            
             if chi > current_threshold and current_iter > 0:
                 error *= np.sqrt(current_threshold/chi)
                 chi = current_threshold
@@ -392,6 +387,7 @@ class LS:
     
     def run(self):
         chi_square = np.zeros((NUM_ITERATIONS, 1))
+        total_outliers = np.zeros((NUM_ITERATIONS, 1))
         current_threshold = ERROR_THRESHOLD
         for i in range(NUM_ITERATIONS):
             print(f"Iteration {i}")
@@ -403,6 +399,7 @@ class LS:
             H, b, chi_iteration, num_outliers = self.iteration(current_state, current_threshold, i)
 
             chi_square[i] = chi_iteration
+            total_outliers[i] = num_outliers
 
             current_threshold = 2.0*chi_iteration/DATA_SIZE
 
@@ -423,14 +420,14 @@ class LS:
                     Chi Square: {chi_iteration} \n \
                     Num_outliers: {num_outliers} \n")
 
-        return X_star, chi_square
+        return X_star, chi_square, total_outliers
 
 if __name__ == "__main__":
     print("Start Least Square")
 
     algo = LS(DATASET_PATH)
 
-    X_final, chi_square = algo.run()
+    X_final, chi_square, total_outliers = algo.run()
 
     sensor_calibrated = np.zeros((DATA_SIZE-1, 2))
     sensor_uncalibrated = np.zeros((DATA_SIZE-1, 2))
@@ -471,11 +468,23 @@ if __name__ == "__main__":
     plt.show()
     plt.close()
 
-    plt.plot(chi_square, color="firebrick")
-    plt.scatter(np.arange(NUM_ITERATIONS), chi_square, color="darkorange", label="Error")
-    plt.legend()
-    plt.xlabel("Time")
-    plt.ylabel("Error")
-    plt.savefig(PICS_PATH / "chi_square.png")
+    fig, axs = plt.subplots(1,2)
+
+    axs[0].plot(chi_square, color="firebrick")
+    axs[0].scatter(np.arange(NUM_ITERATIONS), chi_square, color="darkorange", label="Error Norm")
+    axs[0].legend()
+    axs[0].set_xlabel("Time")
+    axs[0].set_ylabel("Error")
+
+    axs[1].plot(total_outliers, color="darkblue")
+    axs[1].scatter(np.arange(NUM_ITERATIONS), total_outliers, color="royalblue", label="Outliers")
+    axs[1].legend()
+    axs[1].set_xlabel("Time")
+    axs[1].set_ylabel("Outliers")
+
+
+    fig.set_figheight(6)
+    fig.set_figwidth(12)
+    plt.savefig(PICS_PATH / "chi_and_outliers.png")
     plt.show()
     plt.close()
