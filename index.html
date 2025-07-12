@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tricycle Calibration with Least Squares Algorithm</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['\\(','\\)']],
+          displayMath: [['$$','$$'], ['\\[','\\]']]
+        },
+        svg: { fontCache: 'global' }
+      };
+    </script>
+    <style>
+        /* Global page settings */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f9f9f9;
+            color: #333;
+        }
+        /* Header styling */
+        header {
+            background: #045d10;
+            color: white;
+            padding: 0.5rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        /* Main container */
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        /* Headings */
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.5rem; margin-top: 2rem; border-bottom: 2px solid #045d10; padding-bottom: 0.3rem; }
+        /* Paragraphs and lists */
+        p { line-height: 1.6; margin: 1rem 0; }
+        ul { margin: 1rem 0 1rem 1.5rem; }
+        li { margin-bottom: 0.5rem; }
+        /* Code blocks */
+        pre {
+            background: #eef;
+            padding: 1rem;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        code { font-family: "Courier New", Courier, monospace; }
+        /* Images */
+        img { max-width: 100%; display: block; margin: 1rem 0; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Tricycle Calibration</h1>
+    </header>
+    <div class="container">
+        <section>
+            <h2>Overview</h2>
+            <p>This project's aim is to calibrate the kinematic parameters and the sensor pose of a Tricycle robot.</p>
+        </section>
+
+        <section>
+            <h2>1. Dataset</h2>
+            <p>
+                The dataset is composed by 2434 samples, each composed by the following elements:
+                <ul>
+                    <li><strong>time ticks</strong> → time stamp of the measurement</li> 
+                    <li><strong>steering and traction ticks</strong> → reading of the encoders mounted on the robot </li> 
+                    <li><strong>robot global pose</strong> → odometry of the robot </li> 
+                    <li><strong>sensor global pose</strong> → odometry of the sensor</li> 
+                </ul>
+                The robot and sensor global poses given by the dataset are shown in the following plots.
+                <img src="Pics/initial_plot.png" alt="Chi-square error over iterations">
+            </p>
+        </section>
+        
+        <section>
+            <h2>2. Kinematic Model</h2>
+            <p>The vehicle is modeled like a FWD bicycle in SE(2), which is defined as follows: </p>
+            <li>Traction distance \(d_k\):
+                $$
+                    d_k = K_{\mathrm{tract}} \, t_k
+                $$
+            </li>
+            <li>Steering angle \(\phi_k\):
+                $$
+                    \phi_{s_k} = K_{\text{steer}} \, s_k + \delta_{\text{steer}}
+                $$
+            </li>
+        </section>
+        
+        <section>
+            <h2>3. State and Measurement Definition</h2>
+        </section>
+        
+        <section>
+            <h2>4. Error and Jacobian Computation</h2>
+        </section>
+
+        <section>
+            <h2>5. Least Squares Algorithm</h2>
+        </section>
+        <section>
+            <h2>6. Results</h2>
+            <ul>
+                <img src="Pics/chi_and_outliers.png" alt="Chi-square error over iterations">
+                <img src="Pics/sensor_calibration.png" alt="Measured vs Calibrated Trajectories">
+            </ul>
+        </section>
+    </div>
+</body>
+</html>
