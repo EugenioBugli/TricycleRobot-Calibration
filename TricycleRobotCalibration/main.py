@@ -29,8 +29,6 @@ MAX_TRACT_TICK = conf["MAX_TRACT_TICKS"]
 MAX_INT_32 = np.iinfo(np.int32).max
 MAX_UINT_32 = np.iinfo(np.uint32).max
 
-ERROR_THRESHOLD = float(conf["ERROR_THRESHOLD"])
-
 DATASET_PATH = assets_dir / "Data" / "dataset.txt"
 PICS_PATH = assets_dir / "Pics"
 
@@ -191,9 +189,9 @@ class Measurement:
 
     @staticmethod
     def box_minus(prediction: Pose, measurement: Pose):
-        inv_prediction = np.linalg.inv(prediction.to_transformation())
+        inv_measurement = np.linalg.inv(measurement.to_transformation())
         return Pose.from_transformation(
-            inv_prediction @ measurement.to_transformation()
+            inv_measurement @ prediction.to_transformation()
         )
     
 
@@ -239,6 +237,7 @@ def compute_jacobian(X: State, delta_robot: State, Z: Pose,
         X_plus = State.box_plus(
             X=X,
             delta_x=delta_plus_perturbed)
+        # print(f"Delta plus: {perturbation_vector},\n X_plus: {X_plus}")
 
         # MINUS part
         perturbation_vector[i] = -EPSILON
@@ -287,7 +286,6 @@ def compute_jacobian(X: State, delta_robot: State, Z: Pose,
             h_minus = prediction_function(
                 actual_sensor_pose=sensor_pose_minus, 
                 delta_robot=delta_robot)
-            
 
         error_plus = error_function(
             delta_sensor_predicted=h_plus,
@@ -376,19 +374,21 @@ class LS:
                 error *= np.sqrt(current_threshold/chi)
                 chi = current_threshold
                 num_outliers += 1
+                continue
 
             H += J.T @ self.omega @ J
             b += J.T @ self.omega @ error.reshape(-1, 1)
             total_chi += chi
 
-        H += np.diag([0.03,0.03,0.03,0.03,0.3,0.3,0.3])
+        #H += np.diag([3,3,3,30,800,800,800])
+        H += 2 * np.eye(STATE_DIM)
 
         return H, b, total_chi, num_outliers
     
     def run(self):
         chi_square = np.zeros((NUM_ITERATIONS, 1))
         total_outliers = np.zeros((NUM_ITERATIONS, 1))
-        current_threshold = ERROR_THRESHOLD
+        current_threshold = 0
         for i in range(NUM_ITERATIONS):
             print(f"Iteration {i}")
 
@@ -401,7 +401,7 @@ class LS:
             chi_square[i] = chi_iteration
             total_outliers[i] = num_outliers
 
-            current_threshold = 2.0*chi_iteration/DATA_SIZE
+            current_threshold = 3.0*chi_iteration/DATA_SIZE # 3.0
 
             delta_x, _, _, _ = np.linalg.lstsq(H, -b, rcond=None)
             delta_x = delta_x.ravel()
@@ -416,7 +416,7 @@ class LS:
             self.kinematic_parameters = X_star.kinem_param
             self.relative_sensor_pose = X_star.sensor_pose
 
-            print(f"State: {X_star}, \n \
+            print(f"{X_star}, \n \
                     Chi Square: {chi_iteration} \n \
                     Num_outliers: {num_outliers} \n")
 
@@ -430,7 +430,6 @@ if __name__ == "__main__":
     X_final, chi_square, total_outliers = algo.run()
 
     sensor_calibrated = np.zeros((DATA_SIZE-1, 2))
-    sensor_uncalibrated = np.zeros((DATA_SIZE-1, 2))
 
     Ks, Kt, a, delta_s = X_final.kinem_param
     sensor_pose = X_final.sensor_pose
