@@ -286,16 +286,18 @@ def compute_jacobian(X: State, delta_robot: State, Z: Pose,
             h_minus = prediction_function(
                 actual_sensor_pose=sensor_pose_minus, 
                 delta_robot=delta_robot)
-
+            
         error_plus = error_function(
             delta_sensor_predicted=h_plus,
-            delta_sensor_measured=Z)
-        
+            delta_sensor_measured=Z
+        )
+
         error_minus = error_function(
             delta_sensor_predicted=h_minus,
-            delta_sensor_measured=Z)
+            delta_sensor_measured=Z
+        )
             
-        h_delta = error_plus - error_minus
+        h_delta = error_plus - error_minus # h_plus.to_vector() - h_minus.to_vector()
         J[:, i] = h_delta/(2*EPSILON)
     
     return J
@@ -380,7 +382,6 @@ class LS:
             b += J.T @ self.omega @ error.reshape(-1, 1)
             total_chi += chi
 
-        #H += np.diag([3,3,3,30,800,800,800])
         H += 2 * np.eye(STATE_DIM)
 
         return H, b, total_chi, num_outliers
@@ -433,8 +434,11 @@ if __name__ == "__main__":
 
     Ks, Kt, a, delta_s = X_final.kinem_param
     sensor_pose = X_final.sensor_pose
+    inv_sensor_pose = Pose.from_transformation(np.linalg.inv(sensor_pose.to_transformation()))
 
-    actual_robot_pose = Pose(0.0, 0.0, 0.0)
+    _, _, _, _, init_sensor_meas, _ = algo.dataset.get_measurement(0)
+    curret_sensor_pose = Pose.from_vector(init_sensor_meas)
+    sensor_calibrated[0] = curret_sensor_pose.to_vector()[:2]
 
     for i in range(DATA_SIZE-1):
 
@@ -442,19 +446,19 @@ if __name__ == "__main__":
 
         delta_robot, _ = model_prediction(steer_tick, current_tract_tick, next_tract_tick,
                                           Ks, Kt, a, delta_s)
+    
+        delta_sensor = Pose.from_transformation(
+            inv_sensor_pose.to_transformation() @ delta_robot.to_transformation() @ sensor_pose.to_transformation()
+        )
+
+        curret_sensor_pose = Pose.from_transformation(
+            curret_sensor_pose.to_transformation() @ delta_sensor.to_transformation()) 
         
-        actual_robot_pose = Pose.from_transformation(
-            actual_robot_pose.to_transformation() @ delta_robot.to_transformation())
-        
-        world_sensor_pose_calibrated = Pose.from_transformation(
-            actual_robot_pose.to_transformation() @ sensor_pose.to_transformation())
-        
-        sensor_calibrated[i] = world_sensor_pose_calibrated.to_vector()[:2]
+        sensor_calibrated[i] = curret_sensor_pose.to_vector()[:2]
 
     fig, ax = plt.subplots()
 
     ax.scatter(algo.dataset.sensor_poses[:, 0], algo.dataset.sensor_poses[:, 1], color="royalblue", label="Sensor Pose Measured (Dataset)")
-
     ax.scatter(sensor_calibrated[:, 0], sensor_calibrated[:, 1], color="forestgreen", label="Sensor Pose Calibrated (LS)")
 
     ax.legend()
