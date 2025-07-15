@@ -64,9 +64,9 @@
         </section>
 
         <section>
-            <h2>1. Dataset</h2>
+            <h2>1) Dataset</h2>
             <p>
-                The dataset is composed by 2434 samples, each composed by the following elements:
+                The dataset is composed by <strong>2434</strong> samples, each composed by the following elements:
                 <ul>
                     <li><strong>time ticks</strong> → time stamp of the measurement</li> 
                     <li><strong>steering and traction ticks</strong> → reading of the encoders mounted on the robot </li> 
@@ -79,37 +79,107 @@
         </section>
         
         <section>
-            <h2>2. Kinematic Model</h2>
-            <p>The vehicle is modeled like a FWD bicycle in SE(2), which is defined as follows: </p>
-            <li>Traction distance \(d_k\):
+            <h2>2) Kinematic Model</h2>
+            <p>The vehicle is modeled like a <strong>FWD bicycle</strong> in SE(2), which is described by the following kinematic model: 
                 $$
-                    d_k = K_{\mathrm{tract}} \, t_k
+                    \begin{cases}
+                        \begin{align}
+                            \Delta x_k &= \cos(\alpha_k)\cos(\Delta \theta_k) \cdot d_k \\
+                            \Delta y_k &= \cos(\alpha_k)\sin(\Delta \theta_k) \cdot d_k \\
+                            \Delta \theta_k &= \frac{\sin(\alpha_k)}{a_k} \cdot d_k \\
+                            \Delta \phi_k &= \alpha_k
+                        \end{align}
+                    \end{cases}
+                $$
+                where \(\alpha_k\) is the steering angle, \(d_k\) is the traction distance, and \(a_k\) is the axis length of the robot. The steering angle and the traction distance are obtained from the encoders readings that we have in the dataset. The first is measured through an absolute encoder while the latter from an incremental encoder.
+            </p>
+            
+            <li>Definition of the <strong>traction distance</strong> \(d_k\):
+                $$
+                    d_k = K_{\text{t}} \frac{t_k}{t_{\text{max}}}
                 $$
             </li>
-            <li>Steering angle \(\phi_k\):
+            <li>Definition of the <strong>steering angle</strong> \(\alpha_k\):
                 $$
-                    \phi_{s_k} = K_{\text{steer}} \, s_k + \delta_{\text{steer}}
+                    \alpha_{k} = K_{\text{s}} \, s_k \, \frac{2 \pi}{s_{\text{max}}} + \delta_{\text{s}}
                 $$
             </li>
+        <p>
+            Within the equations \(t_k\) and \(s_k\) represent the readings obtained from the incremental and absolute encoders, while \(t_{\text{max}}\) and \(s_{\text{max}}\) are the maximum values related to those ticks.
+            The previous equations contain three of the four kinematic parameters that we would like to calibrate with Least Squares algorithm, which are \(K_s\), \(K_t\) and \(\delta_s\). The first two values represent how many radians and meters correspond to one tick, while the last one is the steering offset.
+        </p>
         </section>
         
         <section>
-            <h2>3. State and Measurement Definition</h2>
+            <h2>3) State and Measurement Definition</h2>
+            <p>The <strong>state</strong> \(X\) of our problem is composed by the kinematic parameters and the sensor pose relative to the robot.
+            $$
+                X = \left[ X_k \;|\; X_s \right] = \left[K_s \;\, K_t \;\, a \;\, \delta_s \;\, | \; {}^rT_s \right] \in \mathbb{R}^4 \times SE(2)
+            $$
+            The euclidean parameterization of the state is the following: 
+            $$
+                \Delta_X = \left[ \Delta_{X_k} \;|\; \Delta_{X_s} \right] = \left[K_s \;\, K_t \;\, a \;\, \delta_s \;\, | \;\, {}^rx_s \;\, {}^ry_s \;\, {}^r\delta_{s}\right] \in \mathbb{R}^7
+            $$
+            Given that \(X\) is composed by a pose, which belongs to a manifold, we need to define the <strong>box-plus</strong> operator.
+            $$
+                X \oplus \Delta_X = \Delta_X \cdot X
+            $$
+            </p>
+            <p>
+                The <strong>measurement</strong> \(Z\) is defined as the displacement of the sensor from the current instant to the next one. This value is computed starting from the global poses of the sensor given by the dataset. The definition of \(Z\) is the following:
+                $$
+                    Z = \left[ \Delta_s \right] \in SE(2)
+                $$
+                Where the displacement is defined as:
+                $$
+                    \Delta_s = {}^wT_{s_i}^{-1} \cdot {}^wT_{s_{i+1}}
+                $$
+                Since we are dealing again with a manifold object, we need to specify the implementation of the <strong>box-minus</strong> operator.
+                $$
+                    Z_1 \ominus Z_2 = Z_2^{-1} \cdot Z_1 
+                $$
+            </p>
+            <p>
+                The prediction function is defined as how much the sensor moved from the last iteration based on the kinematic model that we have previously specified.
+                $$
+                    h(X) = {}^rT_{s}^{-1} \cdot \Delta_r \cdot {}^rT_{s}
+                $$
+            </p>
+
         </section>
         
         <section>
-            <h2>4. Error and Jacobian Computation</h2>
+            <h2>4) Error and Jacobian Computation</h2>
+            <p>
+                The error function specifies the discrepancy between the prediction of the displacement of the sensor and the measured displacement.
+                $$
+                    e(X) = h(X) \ominus Z = Z^{-1} \cdot h(X)
+                $$
+                One of the key element of the Least Squares algorithm is the Jacobian of the error computed with respect to the state \(X\).
+                $$
+                    J(X) = \frac{\partial e(X)}{\partial X} = \left[ J_{k} \;\, J_{s} \right] \in \mathbb{R}^{3 \times 7}
+                $$
+            </p>
         </section>
 
         <section>
-            <h2>5. Least Squares Algorithm</h2>
+            <h2>5) Least Squares Algorithm</h2>
         </section>
         <section>
-            <h2>6. Results</h2>
+            <h2>6) Results</h2>
+            The algorithm has been tested with different parameters, but the following one are the one that leads to a better solution of the problem.
+
+
+            The following plots show the behavior of the error squared norm and the number of outliers over all the simulation.
             <ul>
                 <img src="Pics/chi_and_outliers.png" alt="Chi-square error over iterations">
+            </ul>
+            The error squared norm decrease rapidly like we expected, going towards zero. Inversely, The number of outliers increases at each iteration.
+            The performance of the calibration procedure is shown by the following plot, where the green trajectory is the calibrated motion, whereas the blue one is the uncalibrated. 
+            <ul>
                 <img src="Pics/sensor_calibration.png" alt="Measured vs Calibrated Trajectories">
             </ul>
+            Due to numeric approximation and residual errors we expect to have some overlap between the two trajectories.
         </section>
     </div>
 </body>
