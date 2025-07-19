@@ -176,8 +176,11 @@
                 \end{array}
             $$
             <p>
-                Here, \(H\) is the Hessian matrix, \(b\) is the gradient vector, \(e_j\) is the error on the \(j\)-th sample, and \(J_j\) is the Jacobian matrix.
-            
+                Here, \(e_j\) is the error on the \(j\)-th sample, and \(J_j\) is the Jacobian matrix.
+                The Outliers are discarded if the error norm is bigger than the mean of the previous iteration multiplied by a factor \(\alpha \) to avoid discarding too much.
+                $$
+                    \text{if} \;\, e_j^\top \, e_j > \alpha \cdot \text{threshold}
+                $$
             </p>
         </section>
 
