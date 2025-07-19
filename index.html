@@ -126,11 +126,11 @@
             $$
             </p>
             <p>
-                The <strong>measurement</strong> \(Z\) is defined as the displacement of the sensor from the current instant to the next one. This value is computed starting from the global poses of the sensor given by the dataset. The definition of \(Z\) is the following:
+                The <strong>measurement</strong> \(Z\) is defined as the displacement of the sensor from the current instant to the next one. This value is computed starting from the global pose of the sensor given by the dataset. The definition of \(Z\) is the following:
                 $$
                     Z = \left[ \Delta_s \right] \in SE(2)
                 $$
-                Where the displacement is defined as:
+                Where the displacement of the sensor is defined as:
                 $$
                     \Delta_s = {}^wT_{s_i}^{-1} \cdot {}^wT_{s_{i+1}}
                 $$
@@ -138,37 +138,103 @@
                 $$
                     Z_1 \ominus Z_2 = Z_2^{-1} \cdot Z_1 
                 $$
+                This operator will be used later in the definition of the error function.
             </p>
             <p>
                 The prediction function is defined as how much the sensor moved from the last iteration based on the kinematic model that we have previously specified.
                 $$
-                    h(X) = {}^rT_{s}^{-1} \cdot \Delta_r \cdot {}^rT_{s}
+                    h(X, \, \Delta_r) = {}^rT_{s}^{-1} \cdot \Delta_r \cdot {}^rT_{s}
                 $$
+                In the previous equation, \({}^rT_{s}\) is the relative pose of the sensor that we want to calibrate while \(\Delta_r\)is the infinitesimal movement of the robot from the current instant to the next one. 
             </p>
 
         </section>
-        
+
         <section>
-            <h2>4) Error and Jacobian Computation</h2>
+            <h2>4) Least Squares Algorithm</h2>
+            For the implementation, the standard Least Squares algorithm has been followed.
+            $$
+                \begin{array}{l}
+                \textbf{Given:} \;\; \text{Initial guess for state} \; X_0, \; \text{dataset of measurements} \; \{t_k, s_k\}_{j=1}^N \\[0.8em]
+                \textbf{For} \;\; i = 1, \ldots, \text{max_iterations}: \\
+                \qquad H \gets 0 \\
+                \qquad b \gets 0 \\
+                \qquad \chi \gets 0 \\[0.5em]
+                \qquad \textbf{For each sample } j = 1, \ldots, N: \\
+                \qquad\qquad t_j \,, \;s_j \,, \gets \text{get_measurement}(j) \\
+                \qquad\qquad Z \gets \text{get_measurement}(j) \\
+                \qquad\qquad \Delta_r \gets \text{model_prediction}(X, \, s_j, \, t_j, \, t_{j+1}) \\
+                \qquad\qquad e_j \gets h(X, \, \Delta_r) \ominus Z \\
+                \qquad\qquad J_j \gets \text{compute_jacobian}(X,\, \Delta_r, \, Z) \\
+                \qquad\qquad H \gets H + J_j^\top \Omega \; J_j \\
+                \qquad\qquad b \gets b + J_j^\top \Omega \; e_j \\
+                \qquad\qquad \chi \gets \chi + e_j^\top \, e_j \\
+                \qquad \textbf{End for} \\[0.5em]
+                \qquad \Delta_X \gets \text{solve}(H \, \Delta_X \, = - \, b) \\
+                \qquad X \gets X \oplus \Delta_X \\
+                \textbf{End for}
+                \end{array}
+            $$
             <p>
-                The error function specifies the discrepancy between the prediction of the displacement of the sensor and the measured displacement.
+                Here, \(H\) is the Hessian matrix, \(b\) is the gradient vector, \(e_j\) is the error on the \(j\)-th sample, and \(J_j\) is the Jacobian matrix.
+            
+            </p>
+        </section>
+
+        <section>
+            <h2>5) Error and Jacobian Computation</h2>
+            <p>
+                The error function specifies the discrepancy between the prediction of the displacement of the sensor and the measured displacement. Since we are dealing with two poses, hence manifold objects, we need to use the <strong>box-minus</strong> operator instead of a simple subtraction.
                 $$
-                    e(X) = h(X) \ominus Z = Z^{-1} \cdot h(X)
+                    e(X) = h(X, \, \Delta_r) \ominus Z = Z^{-1} \cdot h(X, \, \Delta_r)
                 $$
                 One of the key element of the Least Squares algorithm is the Jacobian of the error computed with respect to the state \(X\).
                 $$
                     J(X) = \frac{\partial e(X)}{\partial X} = \left[ J_{k} \;\, J_{s} \right] \in \mathbb{R}^{3 \times 7}
                 $$
+                This jacobian has been computed numerically rather than simbolically in the following way.
+                $$
+                    J_i(X) = \frac{e(X \oplus \boldsymbol{\epsilon}) - e(X \ominus \boldsymbol{\epsilon})}{2 \, \epsilon}
+                $$
+                Where \(J_i(X)\) is the \(i\)-th columns of the jacobian matrix, which is related to the \(i\)-th component of the state \(X\). The variable \(\epsilon\) represent the small perturbation applied to the current state \(X\).   
+                Notice that the perturbation vector \(\boldsymbol{\epsilon} \) is composed by all zeros and one \(\epsilon\) in the \(i\)-th position, hence it perturbs only one variable of the state at time. The implementation of the jacobian has been done with the following function:
+                $$
+
+                    \begin{array}{l}
+                    \textbf{compute_jacobian}(X,\, \Delta_r, \, Z): \\[0.8em]
+                    \textbf{For} \;\; i = 1, \ldots, \text{max_iterations}: \\
+                    \qquad X^{+} \gets X \oplus \boldsymbol{\epsilon} \\
+                    \qquad X^{-} \gets X \ominus \boldsymbol{\epsilon} \\[0.4em]
+
+                    \qquad \textbf{if} \;\, i < 4 \;\, (\text{kinematic_parameters}): \\
+                    \qquad \qquad \Delta_+ \gets \text{model_prediction}(X^{+}, \, s_j, \, t_j, \, t_{j+1}) \\ 
+                    \qquad \qquad \Delta_- \gets \text{model_prediction}(X^{-}, \, s_j, \, t_j, \, t_{j+1}) \\ 
+                    \qquad \qquad h_+ \gets h(X, \, \Delta_+) \ominus Z \\
+                    \qquad \qquad h_- \gets h(X, \, \Delta_-) \ominus Z \\
+                    
+
+                    \qquad \textbf{else} \;\, (\text{sensor_pose}): \\
+                    \qquad \qquad h_+ \gets h(X^+, \, \Delta_+) \ominus Z \\
+                    \qquad \qquad h_- \gets h(X^-, \, \Delta_-) \ominus Z \\[0.4em]
+
+                    \qquad e_+ \gets h_+ \ominus Z \\
+                    \qquad e_- \gets h_- \ominus Z \\[0.4em]
+
+                    J_i \gets \dfrac{e_+ - e_-}{2 \epsilon}
+
+                    \end{array}
+                $$
+                Where the prediction function is computed with a different perturbed parameter at each iteration. The first equation shows the computation of the prediction when one of the kinematic parameters is perturbed, while the second when one of the element of the sensor pose is perturbed. 
+                $$
+                    \qquad \qquad h(X, \, \Delta_{+/-}) = {}^rT_{s}^{-1} \cdot \Delta_{+/-} \cdot {}^rT_{s} \\
+                    \qquad \qquad h(X^{+/-}, \, \Delta_+) = {}^rT_{s_{+/-}}^{-1} \cdot \Delta_r \cdot {}^rT_{s_{+/-}} \\
+                $$
             </p>
         </section>
 
         <section>
-            <h2>5) Least Squares Algorithm</h2>
-        </section>
-        <section>
             <h2>6) Results</h2>
-            The algorithm has been tested with different parameters, but the following one are the one that leads to a better solution of the problem.
-
+            The algorithm has been tested with different parameters, but the best solution of the problem has been found with \(\text{max_iterations} = 10\) and \(\epsilon = 1^{-7}\).
 
             The following plots show the behavior of the error squared norm and the number of outliers over all the simulation.
             <ul>
@@ -179,7 +245,7 @@
             <ul>
                 <img src="Pics/sensor_calibration.png" alt="Measured vs Calibrated Trajectories">
             </ul>
-            Due to numeric approximation and residual errors we expect to have some overlap between the two trajectories.
+            Due to numeric approximation and residual errors we expect to not have a complete overlap between the two trajectories.
         </section>
     </div>
 </body>
