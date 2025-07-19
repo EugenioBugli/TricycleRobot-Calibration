@@ -8,6 +8,12 @@ assets_dir = config_dir.resolve().parent
 with open(config_dir / 'config.yml', 'r') as file:
     conf = safe_load(file)
 
+STATE_DIM = conf["STATE_DIM"]
+MEASUREMENT_DIM = conf["MEASUREMENT_DIM"]
+NUM_ITERATIONS = conf["NUM_ITERATIONS"]
+DATA_SIZE = conf["DATA_SIZE"]
+EPSILON = float(conf["EPSILON"])
+
 INITIAL_K_STEER = conf["INITIAL_K_STEER"]
 INITIAL_K_TRACT = conf["INITIAL_K_TRACT"]
 INITIAL_AXIS_LENGTH = conf["INITIAL_AXIS_LENGTH"]
@@ -27,7 +33,6 @@ DATASET_PATH = assets_dir / "Data" / "dataset.txt"
 PICS_PATH = assets_dir / "Pics"
 
 def openData(data_path):
-    # TODO check if this can be done in a better way -> array of Poses ?
 	time, ticks, model_poses, sensor_poses = [], [], [], []
     
 	f = open(data_path)
@@ -94,9 +99,6 @@ class Pose:
         self.x = x
         self.y = y
         self.theta = theta
-
-    def __repr__(self):
-        return f"Pose: {self.x}, {self.y}, {self.theta}"
     
     def __str__(self):
         return f"Pose: {self.x}, {self.y}, {self.theta}"
@@ -124,60 +126,6 @@ class Pose:
             [np.sin(self.theta), np.cos(self.theta), self.y],
             [0, 0, 1]])
         return T
-
-
-class Tricycle:
-    """
-        Use this class to model the behavior of the robot
-    """
-    def __init__(self, initial_pose: Pose):
-
-        self.global_pose = initial_pose 
-
-        self.kinematic_parameters = {
-            "K_STEER": INITIAL_K_STEER,
-            "K_TRACT": INITIAL_K_TRACT,
-            "AXIS_LENGTH": INITIAL_AXIS_LENGTH,
-            "STEER_OFFSET": INITIAL_STEER_OFFSET,
-        }
-        # relative pose, not a global one!
-        self.relative_sensor_pose = Pose(INITIAL_LASER_WRT_BASE_X, 
-                                         INITIAL_LASER_WRT_BASE_Y, 
-                                         INITIAL_LASER_WRT_BASE_ANGLE)
-    
-    def update_pose(self, new_pose: Pose):
-        # set the pose to the new value, which is a relative value
-        r_T_m = new_pose.to_transformation() # movement wrt the robot RF
-        w_T_r = self.global_pose.to_transformation() # robot wrt world RF
-        self.global_pose = Pose.from_transformation(w_T_r @ r_T_m)
-    
-    def update_kinematic_param(self, K_steer, K_tract, axis_length, steer_offset):  
-        self.kinematic_parameters["K_STEER"] = K_steer
-        self.kinematic_parameters["K_TRACT"] = K_tract
-        self.kinematic_parameters["AXIS_LENGTH"] = axis_length
-        self.kinematic_parameters["STEER_OFFSET"] = steer_offset
-
-    def update_sensor_pose(self, new_pose: Pose):
-        self.relative_sensor_pose = new_pose
-
-    def calibrate_parameters(self, K_steer, K_tract, axis_length, steer_offset, new_pose: Pose):
-        self.update_kinematic_param(K_steer, K_tract, axis_length, steer_offset)
-        self.update_sensor_pose(new_pose)
-
-    def model_prediction(self, steer_tick, current_tract_tick, next_tract_tick, 
-                         K_steer, K_tract, axis_length, steer_offset):
-
-        steering_angle = get_steering_angle(steer_tick, K_steer, steer_offset)
-        traction_distance = get_traction_distance(current_tract_tick, next_tract_tick, K_tract)
-
-        # this is the kinematic model of the robot with the elimination of dt
-        # apply dtheta rather than self.global_pose.theta to obtain a local movement
-        dtheta = (np.sin(steering_angle) / axis_length) * traction_distance
-        dx = np.cos(steering_angle)*np.cos(dtheta) * traction_distance
-        dy = np.cos(steering_angle)*np.sin(dtheta) * traction_distance
-        dphi = steering_angle
-
-        return dx.item(), dy.item(), dtheta.item(), dphi.item()
     
 class Dataset:
      
@@ -194,59 +142,3 @@ class Dataset:
     
     def get_measurement(self, idx):
         return self.robot_poses[idx], self.steer_ticks[idx], self.tract_ticks[idx], self.tract_ticks[idx+1], self.sensor_poses[idx], self.sensor_poses[idx+1]
-    
-if __name__ == "__main__":
-    print("Check if everything works")
-    dataset = Dataset(DATASET_PATH)
-    robot = Tricycle(Pose(0.0, 0.0, 0.0))
-
-    fig, axs = plt.subplots(1,2)
-
-    axs[0].scatter(dataset.robot_poses[:, 0], dataset.robot_poses[:, 1], color="royalblue", label="Robot Pose")
-    axs[1].scatter(dataset.sensor_poses[:, 0], dataset.sensor_poses[:, 1], color="darkorange", label="Sensor Pose Measured")
-
-    axs[0].legend()
-    axs[1].legend()
-
-    axs[0].set_xlabel("X")
-    axs[0].set_ylabel("Y")
-    axs[1].set_xlabel("X")
-    axs[1].set_ylabel("Y")
-    fig.set_figheight(5)
-    fig.set_figwidth(18)
-
-    plt.savefig(PICS_PATH / "initial_plot.png")
-    # plt.show()
-    plt.close()
-
-    print("Testing the prediction given by the Model")
-    prediction = np.zeros((dataset.length, 2))
-    for i in range(dataset.length-1):
-
-        _, steer_tick, current_tract_tick, next_tract_tick, _, _ = dataset.get_measurement(i)
-
-        dx, dy, dtheta, dphi = robot.model_prediction(steer_tick, current_tract_tick, next_tract_tick,
-                                                      robot.kinematic_parameters["K_STEER"], robot.kinematic_parameters["K_TRACT"], 
-                                                      robot.kinematic_parameters["AXIS_LENGTH"], robot.kinematic_parameters["STEER_OFFSET"])
-
-        robot.update_pose(Pose(dx, dy, dtheta))
-        prediction[i] = robot.global_pose.to_vector()[:2]
-        
-    fig, axs = plt.subplots(1,2)
-
-    axs[0].scatter(dataset.robot_poses[:, 0], dataset.robot_poses[:, 1], color="firebrick", label="Robot Pose (Dataset)")
-    axs[1].scatter(prediction[:, 0], prediction[:, 1], color="forestgreen", label="Robot Pose (Model)")
-
-    axs[0].legend()
-    axs[1].legend()
-
-    axs[0].set_xlabel("X")
-    axs[0].set_ylabel("Y")
-    axs[1].set_xlabel("X")
-    axs[1].set_ylabel("Y")
-    fig.set_figheight(5)
-    fig.set_figwidth(18)
-
-    plt.savefig(PICS_PATH / "prediction_vs_gt.png")
-    plt.show()
-    plt.close()
